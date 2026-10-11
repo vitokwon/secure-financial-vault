@@ -27,8 +27,9 @@ cd secure-financial-vault
 │   ├── domains/                    # Clean business boundaries
 │   │   ├── crypto/
 │   │   │   ├── __init__.py
-│   │   │   ├── protocols.py        # The Contract (typing.Protocol: CipherEngine)
-│   │   │   └── aes_engine.py       # The Implementation (AES-GCM)
+│   │   │   ├── protocols.py        # The Contracts (CipherEngine & HashEngine)
+│   │   │   ├── aes_engine.py       # Authenticated Encryption (AES-256-GCM)
+│   │   │   └── hasher.py           # Integrity Hashing (SHA-256)
 │   │   │
 │   │   ├── vault/
 │   │   │   ├── __init__.py
@@ -54,4 +55,5 @@ cd secure-financial-vault
 ├── .env.example
 ├── requirements.txt
 ├── setup.bat
+├── setup_guideline.md
 └── README.md
