@@ -22,7 +22,7 @@ class AppSettings(BaseModel):
     def validate_keys(self) -> None:
         """Checks the validity of the default security keys."""
         if not self.fernet_secret_key:
-            raise ValueError("[CRITICAL] FERNET_SECRET_KEY has been set.")
+            raise ValueError("[CRITICAL] FERNET_SECRET_KEY has not been set.")
         if not self.jwt_secret_key:
             raise ValueError("[CRITICAL] JWT_SECRET_KEY is not set.")
 
