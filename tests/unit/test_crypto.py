@@ -75,3 +75,117 @@ def test_sha256_hash_computation_and_verification():
     # 3. Mismatch check when data is modified
     tampered_data = b"CONFIDENTIAL_FINANCIAL_RECORD_2027"
     assert hasher.verify_hash(tampered_data, digest) is False
+
+"""
+tests/unit/test_crypto.py
+Extended test suite covering Security QA edge cases and boundary defense.
+"""
+
+# --------------------------------------------------------------------------
+# Security QA Edge Cases Suite (Proposed by Dhruvi)
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("invalid_key", [
+    b"",                       # Empty byte sequence (0 bytes)
+    b"short_16_bytes!!",      # Under-sized key (16 bytes / AES-128)
+    b"a" * 31,                # Boundary check: 1 byte short (31 bytes)
+    b"a" * 33,                # Boundary check: 1 byte over (33 bytes)
+    b"a" * 64,                # Over-sized key (64 bytes)
+])
+def test_invalid_key_length_rejection(invalid_key: bytes):
+    """
+    [Edge Case 1: Key Boundary Validation]
+    Ensure AesGcmCipherEngine strictly rejects master keys that are not 
+    exactly 32 bytes (256 bits) during engine initialization.
+    """
+    with pytest.raises(ValueError, match="32-byte"):
+        AesGcmCipherEngine(key=invalid_key)
+
+
+def test_wrong_key_decryption_rejected():
+    """
+    [Edge Case 2: Cryptographic Isolation & Integrity]
+    Verify that decrypting authenticated ciphertext with an invalid key 
+    fails immediately due to authentication tag mismatch (AEAD property).
+    """
+    key_alice = os.urandom(32)
+    key_bob = os.urandom(32)
+
+    engine_alice = AesGcmCipherEngine(key=key_alice)
+    engine_bob = AesGcmCipherEngine(key=key_bob)
+
+    raw_data = b"CONFIDENTIAL_FINANCIAL_RECORD_2026"
+    ciphertext = engine_alice.encrypt(raw_data)
+
+    # Attempt to decrypt Alice's ciphertext using Bob's key
+    with pytest.raises(ValueError, match="Decryption failed"):
+        engine_bob.decrypt(ciphertext)
+
+
+@pytest.mark.parametrize("invalid_payload", [
+    "plain_string_data",       # String primitive
+    123456789,                 # Integer primitive
+    {"key": "value"},          # Dictionary
+    ["list", "items"],         # List
+    None,                      # NoneType
+])
+def test_non_byte_input_rejected(invalid_payload):
+    """
+    [Edge Case 3: Type Safety & Input Validation]
+    Verify that non-byte types are rejected with a TypeError at the entry 
+    boundary for both encryption and decryption pipelines.
+    """
+    key = os.urandom(32)
+    engine = AesGcmCipherEngine(key=key)
+
+    # 1. Reject non-byte input during encryption
+    with pytest.raises(TypeError, match="bytes format"):
+        engine.encrypt(invalid_payload)
+
+    # 2. Reject non-byte input during decryption
+    with pytest.raises(TypeError, match="bytes format"):
+        engine.decrypt(invalid_payload)
+
+
+@pytest.mark.parametrize("malformed_payload", [
+    b"",                       # 0 bytes (Empty payload)
+    b"too_short",              # 9 bytes (Header truncated)
+    os.urandom(27),            # 27 bytes (1 byte short of minimum 28-byte GCM payload)
+])
+def test_malformed_ciphertext_rejected(malformed_payload: bytes):
+    """
+    [Edge Case 4: Truncated Payload Defense]
+    Verify that ciphertexts shorter than the minimum header size 
+    (12-byte Nonce + 16-byte Auth Tag = 28 bytes) are rejected before decryption.
+    """
+    key = os.urandom(32)
+    engine = AesGcmCipherEngine(key=key)
+
+    with pytest.raises(ValueError, match="too short or malformed"):
+        engine.decrypt(malformed_payload)
+
+
+def test_random_nonce_produces_unique_ciphertexts():
+    """
+    [Edge Case 5: CSPRNG Entropy Verification]
+    Verify that encrypting identical plaintext multiple times yields unique 
+    ciphertexts and unique nonces, preventing replay attacks and pattern leakage.
+    """
+    key = os.urandom(32)
+    engine = AesGcmCipherEngine(key=key)
+    identical_plaintext = b"CONFIDENTIAL_PAYROLL_DATA"
+
+    # Encrypt identical data 10 times consecutively
+    generated_ciphertexts = [engine.encrypt(identical_plaintext) for _ in range(10)]
+
+    # 1. Assert all 10 ciphertext payloads are distinct
+    unique_ciphertexts = set(generated_ciphertexts)
+    assert len(unique_ciphertexts) == 10
+
+    # 2. Assert all 10 extracted 12-byte nonces are distinct
+    nonces = {ct[:12] for ct in generated_ciphertexts}
+    assert len(nonces) == 10
+
+    # 3. Assert all distinct ciphertexts decrypt back to the original plaintext
+    for ct in generated_ciphertexts:
+        assert engine.decrypt(ct) == identical_plaintext
