@@ -1,0 +1,89 @@
+name: Threat Model Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "app/**"
+      - "requirements.txt"
+      - ".env.example"
+      - "docs/THREAT_MODEL.md"
+      - ".github/workflows/threat-model-review.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  threat-model-review:
+    name: Enforce threat-model review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect pull request changes
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
+
+          project_changed=false
+          threat_model_changed=false
+
+          while IFS= read -r file; do
+            if [[ "$file" == "requirements.txt" || "$file" == ".env.example" || "$file" == app/* ]]; then
+              project_changed=true
+            fi
+
+            if [[ "$file" == "docs/THREAT_MODEL.md" ]]; then
+              threat_model_changed=true
+            fi
+          done < changed-files.txt
+
+          {
+            echo "project_changed=$project_changed"
+            echo "threat_model_changed=$threat_model_changed"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write threat-model review summary
+        shell: bash
+        env:
+          PROJECT_CHANGED: ${{ steps.changes.outputs.project_changed }}
+          THREAT_MODEL_CHANGED: ${{ steps.changes.outputs.threat_model_changed }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Threat Model Review"
+            echo
+            if [[ "$PROJECT_CHANGED" == "true" && "$THREAT_MODEL_CHANGED" == "false" ]]; then
+              echo "❌ Security-related project files changed, but \\`docs/THREAT_MODEL.md\\` did not change."
+              echo
+              echo "Please review and update the threat model in this pull request."
+            elif [[ "$PROJECT_CHANGED" == "true" && "$THREAT_MODEL_CHANGED" == "true" ]]; then
+              echo "✅ Security-related project files changed and \\`docs/THREAT_MODEL.md\\` was updated."
+            else
+              echo "✅ No security-related project files changed. No threat-model update is required by this check."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce threat-model review
+        shell: bash
+        env:
+          PROJECT_CHANGED: ${{ steps.changes.outputs.project_changed }}
+          THREAT_MODEL_CHANGED: ${{ steps.changes.outputs.threat_model_changed }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$PROJECT_CHANGED" == "true" && "$THREAT_MODEL_CHANGED" == "false" ]]; then
+            echo "::error::Security-related project files changed, but docs/THREAT_MODEL.md was not updated."
+            exit 1
+          fi
