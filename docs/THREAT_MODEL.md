@@ -6,8 +6,8 @@
 |---|---|
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
-| Current version | **v0.2 — Draft** |
-| Last updated | 2026-10-12 |
+| Current version | **v0.3 — Draft** |
+| Last updated | 2026-10-17 |
 | Code baseline reviewed | Initial scaffold (`app/main.py`, `app/config.py`, `.env.example`, `requirements.txt`) |
 | Methodology | STRIDE per component, Likelihood × Impact risk rating |
 
@@ -142,6 +142,7 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 |---|---|---|---|
 | v0.1 | 2026-10-12 | D. Williams | Initial draft: scope, assets, trust boundaries, 15 STRIDE threats, scaffold code review findings F-01 to F-07 |
 | v0.2 | 2026-10-12 | D. Williams | Risk bands aligned to 6–9 High / 3–4 Medium / 1–2 Low and scores shown; added T4 (SQL injection), I5 (stolen disk/backup), I6 (master key compromise); I1 narrowed to repository exposure; added Demo column, L/I definitions and ID conventions; tests TC-14, TC-15 added |
+| v0.3 | 2026-10-17 | D. Williams | Added automated controls section documenting Ruff and Bandit checks in CI and how they complement threat-model review governance |
 
 ## 12. Review Triggers
 
@@ -151,3 +152,12 @@ Update this document (and bump the version) when:
 2. A finding or threat changes status (e.g., Planned → Implemented → Verified).
 3. A test case passes or fails.
 4. Before each submission milestone (report draft, final report, presentation).
+
+## 13. Automated CI Controls (Code Quality and Security)
+
+The `code-quality.yml` workflow adds automated checks for:
+
+- **Ruff** for Python linting and formatting consistency.
+- **Bandit** for common insecure Python coding patterns.
+
+These controls complement the existing `threat-model-review.yml` workflow, which enforces documentation updates when security-sensitive project files change. Ruff and Bandit reduce implementation risk, but they do **not** replace threat modeling, test coverage, or manual security review.
