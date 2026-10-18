@@ -6,7 +6,7 @@
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Current version | **v0.1 — Draft** |
 | Last updated | 2026-10-18 |
-| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.3 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) |
+| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.4 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.4 |
 | Code baseline | `main` at the documentation update commit |
 
 > Items marked **TBC** require confirmation from the code owner before the final report export. This document distinguishes implemented repository components from planned application features.
@@ -24,14 +24,14 @@ Authentication, role-based authorization, audit logging, and complete API delive
 | Layer | Technology | Current status / notes |
 |---|---|---|
 | API | FastAPI, Swagger UI | Application scaffold exists; complete `/auth`, `/vault`, and `/audit` delivery is TBC. `/docs` is exposed for the demo only (F-06). |
-| Authentication | bcrypt password hashing; JWT signed with HS256 | Planned/TBC. The threat model requires a fixed HS256 algorithm and short token lifetime. |
+| Authentication | bcrypt password hashing; JWT signed with HS256 | Planned/TBC for full auth module. Configuration now enforces HS256 and short token TTL bounds. |
 | Authorization | Three-tier RBAC: Administrator, Compliance Auditor, General Staff | Planned/TBC. Role checks must be enforced server-side on every protected request. |
 | Encryption | AES-256-GCM in `app/domains/crypto/aes_engine.py` | Implemented. AES-GCM authenticates ciphertext and rejects modified payloads. |
 | Integrity | SHA-256 with constant-time comparison in `app/domains/crypto/hasher.py` | Implemented. HMAC protection of stored hashes is planned for T2. |
 | Metadata model | `EncryptedEnvelope` in `app/domains/vault/models.py` | Implemented for vault file metadata. Full SQLite metadata integration is TBC. |
 | File store | `vault_storage/` through `DiskVaultStorage` | Implemented. Stores `{file_id}.bin` ciphertext separately from `{file_id}.meta.json` metadata. |
 | Audit log | Append-only, hash-chained security-event log | Planned/TBC. Do not describe this as implemented until the logger and verification routine exist. |
-| Secrets | `.env` (git-ignored) | Design requirement. Encryption and JWT secrets must not be committed or stored in the database. |
+| Secrets | `.env` (git-ignored), `.env.example`, `setup.bat`, `app/config.py` | Implemented safeguards: startup rejects empty/weak secrets; setup halts when required secrets are blank. |
 | Dependency wiring | `app/dependencies.py` | Present in the project layout; complete production wiring is TBC. |
 
 ## 3. Components
@@ -101,6 +101,18 @@ vault_storage/{file_id}.bin
 vault_storage/{file_id}.meta.json
 ```
 
+### 4.4 Configuration and Setup Validation
+
+- `requirements.txt` explicitly includes `python-dotenv` because `app/config.py` uses `dotenv.load_dotenv`.
+- `setup.bat` creates/reuses `.venv`, installs dependencies, creates `.env` from `.env.example`, initializes `vault_storage`, and stops with a clear error if required steps fail.
+- `setup.bat` performs dependency and vault-module import checks, then blocks completion if required `.env` secrets are empty.
+- `app/config.py` validates:
+  - encryption key format as URL-safe base64 that decodes to exactly 32 bytes (AES-256-GCM requirement),
+  - JWT secret length (minimum 32 bytes),
+  - fixed `HS256` algorithm,
+  - access-token lifetime range of 1–15 minutes.
+- Configuration supports a backward-compatible key transition: `ENCRYPTION_KEY` is preferred and legacy `FERNET_SECRET_KEY` is accepted only when `ENCRYPTION_KEY` is unset.
+
 ## 5. Key Request Flows
 
 The following flows describe the target application design. Steps marked **planned/TBC** are not represented as complete implementation in the current repository.
@@ -169,16 +181,16 @@ Target rules: users are pre-registered by an Administrator, users cannot change 
 | Control | Component | Threats | Findings | Tests | Current status |
 |---|---|---|---|---|---|
 | bcrypt hashing, lockout, and generic errors | Auth service | S1 | F-05 | TC-01 | Planned / TBC |
-| HS256 fixed in code, strong secret, and short expiry | Auth service/config | S2, E2 | F-01, F-02, F-07 | TC-02, TC-13 | Planned / TBC |
+| HS256 fixed in code, strong secret, and short expiry | Auth service/config | S2, E2 | F-01, F-02, F-07 | TC-02, TC-13 | Implemented in `app/config.py`; full auth flow tests remain planned |
 | Role reloaded from DB and deny by default | RBAC guards | E1, E2 | — | TC-12, TC-13 | Planned / TBC |
-| AES-256-GCM authenticated encryption | Crypto engine | T1, I5 | F-04 | TC-03, TC-15 | Implemented; tests to record |
+| AES-256-GCM authenticated encryption | Crypto engine | T1, I5 | F-04 | TC-03, TC-15 | Implemented; TC-15 storage-path evidence recorded, TC-03 tamper test mapping still pending matrix update |
 | HMAC-protected integrity hashes | Crypto engine | T2 | — | TC-04 | Planned |
-| Safe path resolution and confinement | Vault storage | I2 | F-08 | TC-08 | Implemented; tests available |
-| Separate ciphertext and metadata storage | Vault storage | I5 | F-09 | TC-15 | Implemented; tests available |
+| Safe path resolution and confinement | Vault storage | I2 | F-08 | TC-08 | Verified with passing vault unit tests |
+| Separate ciphertext and metadata storage | Vault storage | I5 | F-09 | TC-15 | Verified with passing vault unit tests |
 | Parameterized queries / ORM | Database access | T4 | — | TC-14 | Planned / TBC |
 | Size limit, rate limiting, and magic-byte allowlist | Input validation | D1, D2 | — | TC-10, TC-11 | Planned / TBC |
 | Hash-chained append-only audit log | Audit logger | T3, R1 | — | TC-05, TC-06 | Planned / TBC |
-| Keys only in git-ignored `.env`, checked at startup | Configuration | I1, I6 | F-02, F-03 | TC-07 | Partially documented; implementation TBC |
+| Keys only in git-ignored `.env`, checked at startup | Configuration | I1, I6 | F-02, F-03, F-04 | TC-07 | Implemented startup validation and setup guardrails; environment hygiene test coverage in progress |
 
 ## 8. Design Decisions
 
