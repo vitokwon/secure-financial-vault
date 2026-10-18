@@ -1,0 +1,78 @@
+# Documentation Guide and Version Control
+
+**Owner:** David Williams (Technical Documentation Lead)
+
+This guide defines where project documents live, how they are versioned, and how they are updated so the final report remains consistent with the implementation. The Markdown documents are the source of truth for the project documentation set.
+
+## 1. Document Register
+
+| Document | File | Owner | Current version |
+|---|---|---|---|
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | **v0.3 — Draft** |
+| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | **v0.1 — Initial** |
+| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | — (to create) |
+| Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | — (to create) |
+| Final technical report | `docs/report/` (Word export) | David Williams | — (to create) |
+| Setup guide | `README.md`, `setup_guideline.md` | OhUk Kwon | — |
+
+Update the **Current version** column whenever a document's version changes. Add new project documents to this register when they are created.
+
+## 2. Version Numbering
+
+| Version | Meaning |
+|---|---|
+| `v0.x` | Working draft; changes as modules are built (`v0.1`, `v0.2`, …) |
+| `v1.0` | Version submitted with the final report |
+| `v1.x` | Corrections after submission, for example before the presentation |
+
+**Bump the version when:** a section is added, a threat or finding changes status, a major implementation change is documented, or a submission milestone is reached. Typo fixes and formatting-only changes do not require a new version.
+
+## 3. How to Update a Document
+
+1. Create a branch, for example:
+   `git checkout -b docs/threat-model-v0.4`
+2. Edit the document and add a row to its **Change Log** table, where the document has one.
+3. Update the version number at the top of the document and in this Document Register.
+4. Commit with a `docs:` prefix, for example:
+   `git commit -m "docs: threat model v0.4 - update verified controls"`
+5. Open a Pull Request and ask at least one teammate to review.
+6. After merge, verify that cross-document references, IDs, and version numbers remain consistent.
+
+## 4. Milestone Tags
+
+Tag the repository at each submission milestone so the exact code and documents can be recovered:
+
+```bash
+git tag -a docs-v1.0 -m "Final report submission"
+git push origin docs-v1.0
+```
+
+Suggested tags:
+
+- `docs-v0.5` — report draft
+- `docs-v1.0` — final report
+- `docs-v1.1` — presentation or post-submission corrections
+
+## 5. Keeping the Report in Sync
+
+- The Markdown files are the **source of truth**. The final Word report is exported from them, not edited separately.
+- Before exporting, confirm that every threat marked `Verified` has a passing test in the test matrix.
+- Confirm that threat IDs, finding IDs, and test IDs match across the threat model, test matrix, report, slides, and demo script.
+- Record the Git tag and commit ID in the report appendix so reviewers can trace the report to the code.
+- When implementation changes affect a documented threat, finding, control, or test, update the relevant documentation in the same change or in a follow-up documentation PR.
+
+## 6. Documentation and Security Rules
+
+- Never paste real keys, passwords, tokens, or `.env` contents into any document.
+- Screenshots must not show secrets, tokens, personal information, or sensitive financial data.
+- One owner per document approves its changes; anyone may suggest edits through a Pull Request.
+- Keep the threat model's status values accurate: `Open`, `Planned`, `Implemented`, or `Verified`.
+- Do not mark a control `Verified` until the associated test case has passed and the result is recorded.
+- Update `docs/THREAT_MODEL.md` when a new security-relevant module is merged or when a threat, finding, mitigation, residual risk, or test status changes.
+
+## 7. Change Log
+
+| Version | Date | Author | Changes |
+|---|---|---|---|
+| v0.1 | 2026-10-12 | D. Williams | Initial documentation guide: document register, versioning rules, update workflow, milestone tags, report synchronization, and security rules. |
+| v0.1 | 2026-10-18 | D. Williams | Included the initial guide in the repository under `docs/` and synchronized the register with the current threat model version (`v0.3`). |
