@@ -6,16 +6,18 @@ This guide defines where project documents live, how they are versioned, and how
 
 ## 1. Document Register
 
-| Document | File | Owner | Current version |
-|---|---|---|---|
-| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | **v0.3 — Draft** |
-| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | **v0.1 — Initial** |
-| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | — (to create) |
-| Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | — (to create) |
-| Final technical report | `docs/report/` (Word export) | David Williams | — (to create) |
-| Setup guide | `README.md`, `setup_guideline.md` | OhUk Kwon | — |
+| Document | File | Owner | Reviewer | Version | Status | Last updated |
+|---|---|---|---|---|---|---|
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | **v0.3 — Draft** | Draft | 2026-10-18 |
+| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | **v0.3 — Draft** | Draft | 2026-10-18 |
+| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | **v0.1 — Draft** | Draft | 2026-10-18 |
+| Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | **v0.1 — Draft** | Draft | 2026-10-18 |
+| Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
+| Final technical report | `docs/report/` | David Williams | All | — | Not started | — |
+| Presentation slides | `docs/presentation/` | David Williams | All | — | Not started | — |
+| Setup guide | `README.md`, `setup_guideline.md` | OhUk Kwon | Dhruvi Sorathiya | — | Exists, unversioned | — |
 
-Update the **Current version** column whenever a document's version changes. Add new project documents to this register when they are created.
+Update the **Version**, **Status**, and **Last updated** columns whenever a document changes. Add new project documents to this register when they are created.
 
 ## 2. Version Numbering
 
@@ -69,6 +71,9 @@ Suggested tags:
 - Keep the threat model's status values accurate: `Open`, `Planned`, `Implemented`, or `Verified`.
 - Do not mark a control `Verified` until the associated test case has passed and the result is recorded.
 - Update `docs/THREAT_MODEL.md` when a new security-relevant module is merged or when a threat, finding, mitigation, residual risk, or test status changes.
+- A document may describe planned or proposed work, but must not describe unimplemented controls as implemented.
+- File paths, test locations, phase labels, and implementation statuses must be checked against the current repository before each report export.
+- If a test ID is marked proposed, it must not be counted as formal threat coverage until it is added to the threat register and executed.
 
 ## 7. Change Log
 
@@ -76,3 +81,4 @@ Suggested tags:
 |---|---|---|---|
 | v0.1 | 2026-10-12 | D. Williams | Initial documentation guide: document register, versioning rules, update workflow, milestone tags, report synchronization, and security rules. |
 | v0.1 | 2026-10-18 | D. Williams | Included the initial guide in the repository under `docs/` and synchronized the register with the current threat model version (`v0.3`). |
+| v0.3 | 2026-10-18 | D. Williams | Registered `docs/ARCHITECTURE.md`, `docs/TEST_MATRIX.md`, and `docs/wbs.md`; added repository consistency rules for implementation status and proposed test handling. |
