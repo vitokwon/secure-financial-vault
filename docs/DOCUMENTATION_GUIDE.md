@@ -8,8 +8,8 @@ This guide defines where project documents live, how they are versioned, and how
 
 | Document | File | Owner | Reviewer | Version | Status | Last updated |
 |---|---|---|---|---|---|---|
-| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.4 | Draft | 2026-10-18 |
-| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.4 | Draft | 2026-10-18 |
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.5 | Draft | 2026-10-19 |
+| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.5 | Draft | 2026-10-19 |
 | Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.1 | Draft | 2026-10-18 |
 | Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-18 |
 | Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
@@ -69,7 +69,8 @@ Suggested tags:
 - A document may describe planned or proposed work, but it must not describe unimplemented controls as implemented.
 - File paths, test locations, phase labels, and implementation statuses must be checked against the current repository before each report export.
 - If a test ID is marked as proposed, it must not be counted as formal threat coverage until it is added to the threat register and executed.
-- Review `requirements.txt`, setup scripts (`setup.bat`/platform equivalents), `.env.example`, and configuration code together; a change in one can invalidate setup or create unsafe defaults in the others.
+- When a linked document changes version, update the Document Register and all cross-document version references in the same documentation change.
+- Review `requirements.txt`, setup scripts, `.env.example`, and configuration code together because a change in one can invalidate local setup or create unsafe defaults.
 
 ## 6. Documentation and Security Rules
 
@@ -79,6 +80,8 @@ Suggested tags:
 - Keep the threat model's status values accurate: `Open`, `Planned`, `Implemented`, or `Verified`.
 - Do not mark a control `Verified` until the associated test case has passed and the result is recorded.
 - Update `docs/THREAT_MODEL.md` when a new security-relevant module is merged or when a threat, finding, mitigation, residual risk, or test status changes.
+- Never commit generated `.env` files or secret values.
+- Security configuration controls must not be marked `Verified` until their tests have passed and the evidence is recorded in `docs/TEST_MATRIX.md`.
 
 ## 7. Change Log
 
@@ -86,6 +89,7 @@ Suggested tags:
 |---|---|---|---|
 | v0.1 | 2026-10-12 | D. Williams | Initial documentation guide: document register, versioning rules, update workflow, milestone tags, report synchronization, and security rules. |
 | v0.1 | 2026-10-18 | D. Williams | Included the initial guide in the repository under `docs/` and synchronized the register with the current threat model version (`v0.3`). |
-| v0.2 | 2026-10-18 | D. Williams | Expanded the register with reviewer, status, and last-updated fields; added presentation slides; registered draft `TEST_MATRIX.md` v0.1 and `ARCHITECTURE.md` v0.1; documented Word-to-PDF report export. |
+| v0.2 | 2026-10-18 | D. Williams | Expanded the register with reviewer, status, and last-updated fields; added the architecture notes, security test matrix, work breakdown structure, and presentation deliverables; clarified documentation consistency and proposed-test handling. |
 | v0.3 | 2026-10-18 | D. Williams | Added `docs/wbs.md` to the document register; added consistency rules for implementation status, test coverage, repository paths, and proposed test IDs; synchronized the guide with the current documentation set. |
-| v0.4 | 2026-10-18 | D. Williams | Added a cross-check rule requiring dependency manifests, setup scripts, `.env.example`, and configuration code to be reviewed together to prevent unsafe setup drift. |
+| v0.4 | 2026-10-18 | D. Williams | Synchronized the guide with the merged configuration-hardening documentation and expanded setup/dependency review rules. |
+| v0.5 | 2026-10-19 | D. Williams | Synchronized the register and cross-document references with threat model v0.5 and the merged security-hardening baseline on `main`. |
