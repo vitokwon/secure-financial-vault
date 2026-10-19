@@ -8,10 +8,10 @@ This guide defines where project documents live, how they are versioned, and how
 
 | Document | File | Owner | Reviewer | Version | Status | Last updated |
 |---|---|---|---|---|---|---|
-| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.5 | Draft | 2026-10-19 |
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.6 | Draft | 2026-10-19 |
 | Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.5 | Draft | 2026-10-19 |
-| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.1 | Draft | 2026-10-18 |
-| Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-18 |
+| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.2 | Draft | 2026-10-19 |
+| Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-19 |
 | Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
 | Final technical report | `docs/report/` (Word → PDF export) | David Williams | All | — | Not started | — |
 | Presentation slides | `docs/presentation/` (`.pptx` / `.pdf`) | David Williams | All | — | Not started | — |
@@ -36,11 +36,11 @@ Update the **Version**, **Status**, and **Last updated** columns whenever a docu
 ## 3. How to Update a Document
 
 1. Create a branch, for example:
-   `git checkout -b docs/threat-model-v0.4`
+   `git checkout -b docs/threat-model-v0.6`
 2. Edit the document and add a row to its **Change Log** table, where the document has one.
 3. Update the version number at the top of the document and in this Document Register.
 4. Commit with a `docs:` prefix, for example:
-   `git commit -m "docs: threat model v0.4 - update verified controls"`
+   `git commit -m "docs: threat model v0.6 - update verified controls"`
 5. Open a Pull Request and ask at least one teammate to review.
 6. After merge, verify that cross-document references, IDs, file paths, implementation statuses, and version numbers remain consistent.
 
@@ -55,7 +55,7 @@ git push origin docs-v1.0
 
 Suggested tags:
 
-- `docs-v0.5` — report draft
+- `docs-v0.6` — report draft
 - `docs-v1.0` — final report
 - `docs-v1.1` — presentation or post-submission corrections
 
@@ -68,9 +68,11 @@ Suggested tags:
 - When implementation changes affect a documented threat, finding, control, or test, update the relevant documentation in the same change or in a follow-up documentation PR.
 - A document may describe planned or proposed work, but it must not describe unimplemented controls as implemented.
 - File paths, test locations, phase labels, and implementation statuses must be checked against the current repository before each report export.
-- If a test ID is marked as proposed, it must not be counted as formal threat coverage until it is added to the threat register and executed.
+- Proposed tests, including TC-16 through TC-23, are not formal coverage until they have a matrix row and the required execution or inspection evidence.
+- Review `requirements.txt`, setup scripts (`setup.bat`/platform equivalents), `.env.example`, and configuration code together; a change in one can invalidate setup or create unsafe defaults.
 - When a linked document changes version, update the Document Register and all cross-document version references in the same documentation change.
-- Review `requirements.txt`, setup scripts, `.env.example`, and configuration code together because a change in one can invalidate local setup or create unsafe defaults.
+- Reconcile threat counts, risk totals, baseline commit references, implementation statuses, and setup/configuration claims before each report export.
+- Do not mark a control `Verified` based on source inspection alone; record the test result, executor, date, and commit in `docs/TEST_MATRIX.md`.
 
 ## 6. Documentation and Security Rules
 
@@ -81,7 +83,7 @@ Suggested tags:
 - Do not mark a control `Verified` until the associated test case has passed and the result is recorded.
 - Update `docs/THREAT_MODEL.md` when a new security-relevant module is merged or when a threat, finding, mitigation, residual risk, or test status changes.
 - Never commit generated `.env` files or secret values.
-- Security configuration controls must not be marked `Verified` until their tests have passed and the evidence is recorded in `docs/TEST_MATRIX.md`.
+- Ensure architecture, threat-model, test-matrix, and guide references use the versions recorded in the Document Register.
 
 ## 7. Change Log
 
@@ -89,7 +91,7 @@ Suggested tags:
 |---|---|---|---|
 | v0.1 | 2026-10-12 | D. Williams | Initial documentation guide: document register, versioning rules, update workflow, milestone tags, report synchronization, and security rules. |
 | v0.1 | 2026-10-18 | D. Williams | Included the initial guide in the repository under `docs/` and synchronized the register with the current threat model version (`v0.3`). |
-| v0.2 | 2026-10-18 | D. Williams | Expanded the register with reviewer, status, and last-updated fields; added the architecture notes, security test matrix, work breakdown structure, and presentation deliverables; clarified documentation consistency and proposed-test handling. |
+| v0.2 | 2026-10-18 | D. Williams | Expanded the register with reviewer, status, and last-updated fields; added presentation slides; registered draft `TEST_MATRIX.md` v0.1 and `ARCHITECTURE.md` v0.1. |
 | v0.3 | 2026-10-18 | D. Williams | Added `docs/wbs.md` to the document register; added consistency rules for implementation status, test coverage, repository paths, and proposed test IDs; synchronized the guide with the current documentation set. |
-| v0.4 | 2026-10-18 | D. Williams | Synchronized the guide with the merged configuration-hardening documentation and expanded setup/dependency review rules. |
-| v0.5 | 2026-10-19 | D. Williams | Synchronized the register and cross-document references with threat model v0.5 and the merged security-hardening baseline on `main`. |
+| v0.4 | 2026-10-18 | D. Williams | Added a cross-check rule requiring dependency manifests, setup scripts, `.env.example`, and configuration code to be reviewed together to prevent unsafe setup drift. |
+| v0.5 | 2026-10-19 | D. Williams | Synchronized the register and cross-document references with threat model v0.6, test matrix v0.2, and architecture v0.1; added baseline, risk-total, proposed-test, and implementation-status consistency rules. |
