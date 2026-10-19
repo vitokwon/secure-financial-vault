@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI
+
 from app.config import settings
 
 

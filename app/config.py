@@ -1,20 +1,26 @@
 import base64
 import binascii
 import os
-from pydantic import BaseModel, Field
+
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 load_dotenv()
+
 
 class AppSettings(BaseModel):
     # Application Configuration
     project_name: str = Field(
-        default_factory=lambda: os.getenv("PROJECT_NAME", "Role-Based Secure Financial Document Vault")
+        default_factory=lambda: os.getenv(
+            "PROJECT_NAME", "Role-Based Secure Financial Document Vault"
+        )
     )
     api_v1_str: str = Field(default_factory=lambda: os.getenv("API_V1_STR", "/api/v1"))
 
     # Cryptographic Keys
-    encryption_key: str = Field(default_factory=lambda: os.getenv("ENCRYPTION_KEY", os.getenv("FERNET_SECRET_KEY", "")))
+    encryption_key: str = Field(
+        default_factory=lambda: os.getenv("ENCRYPTION_KEY", os.getenv("FERNET_SECRET_KEY", ""))
+    )
     jwt_secret_key: str = Field(default_factory=lambda: os.getenv("JWT_SECRET_KEY", ""))
     algorithm: str = Field(default_factory=lambda: os.getenv("ALGORITHM", "HS256"))
     access_token_expire_minutes: int = Field(
@@ -22,7 +28,9 @@ class AppSettings(BaseModel):
     )
 
     # Database & Storage
-    database_url: str = Field(default_factory=lambda: os.getenv("DATABASE_URL", "sqlite:///./vault.db"))
+    database_url: str = Field(
+        default_factory=lambda: os.getenv("DATABASE_URL", "sqlite:///./vault.db")
+    )
     storage_dir: str = Field(default_factory=lambda: os.getenv("STORAGE_DIR", "./vault_storage"))
 
     @staticmethod
@@ -50,6 +58,7 @@ class AppSettings(BaseModel):
             raise ValueError("[CRITICAL] ALGORITHM must be HS256.")
         if self.access_token_expire_minutes < 1 or self.access_token_expire_minutes > 15:
             raise ValueError("[CRITICAL] ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 15.")
+
 
 settings = AppSettings()
 settings.validate_keys()

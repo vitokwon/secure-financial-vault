@@ -5,6 +5,7 @@ Defines abstract contracts for secure file storage operations and path resolutio
 
 from pathlib import Path
 from typing import Protocol, runtime_checkable
+
 from app.domains.vault.models import EncryptedEnvelope
 
 

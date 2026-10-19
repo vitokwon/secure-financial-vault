@@ -3,12 +3,11 @@ tests/unit/test_vault.py
 Security QA test suite for Path Traversal defense and isolated vault disk storage.
 """
 
-import os
 import pytest
-from pathlib import Path
+
+from app.domains.vault.disk_storage import DiskVaultStorage
 from app.domains.vault.models import EncryptedEnvelope
 from app.domains.vault.protocols import VaultStorageProtocol
-from app.domains.vault.disk_storage import DiskVaultStorage
 
 
 @pytest.fixture
@@ -27,7 +26,7 @@ def sample_envelope():
         sha256_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         size_bytes=1024,
         content_type="application/pdf",
-        owner_id="auditor_01"
+        owner_id="auditor_01",
     )
 
 
@@ -43,16 +42,19 @@ def test_safe_path_resolution(temp_vault):
     assert resolved.name == "invoice_2026.enc"
 
 
-@pytest.mark.parametrize("malicious_path", [
-    "../../etc/passwd",
-    "..\\..\\Windows\\System32\\cmd.exe",
-    "....//....//sensitive.key",
-    "/etc/shadow",
-    "C:\\Windows\\system.ini",
-    "vault_storage/../../secret.txt",
-    ".",
-    "..",
-])
+@pytest.mark.parametrize(
+    "malicious_path",
+    [
+        "../../etc/passwd",
+        "..\\..\\Windows\\System32\\cmd.exe",
+        "....//....//sensitive.key",
+        "/etc/shadow",
+        "C:\\Windows\\system.ini",
+        "vault_storage/../../secret.txt",
+        ".",
+        "..",
+    ],
+)
 def test_directory_traversal_mitigation(temp_vault, malicious_path):
     """
     STRIDE I2 Mitigation Test:
