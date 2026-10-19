@@ -235,6 +235,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v0.4 | 2026-10-19 | D. Williams | Reconciled threat model structure and evidence references during pre-merge review of security-hardening changes; retained open configuration items pending merged baseline confirmation |
 | v0.5 | 2026-10-19 | D. Williams | Synchronized with merged security hardening on `main@9cb8b91db2b05257199fb24024de45d0e4225b3b`; removed duplicate metadata rows, updated S2/I1 wording, and marked implemented configuration findings while retaining remaining open/planned items |
 | v0.6 | 2026-10-19 | D. Williams | Best-practice review: added threat actors, STRIDE-per-element coverage, supply-chain/CI/key-loss/database-tampering threats, mitigation tracking, residual-risk analysis, and proposed tests TC-16 through TC-23; corrected risk totals and reconciled setup claims with the current implementation. |
+| v0.7 | 2026-10-19 | O. Kwon | Updated Auth domain with StrEnum models, Bcrypt hasher, and trailing newline formatting |
 
 ## 12. Review Triggers
 
