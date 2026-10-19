@@ -4,10 +4,10 @@
 |---|---|
 | Document owner | Dhruvi Sorathiya (Security QA & Demonstration Lead) |
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
-| Current version | **v0.1 — Draft** |
-| Last updated | 2026-10-18 |
-| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.4 · [`ARCHITECTURE.md`](ARCHITECTURE.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.4 |
-| Code baseline | `main` at the documentation update commit |
+| Current version | **v0.2 — Draft** |
+| Last updated | 2026-10-19 |
+| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.6 · [`ARCHITECTURE.md`](ARCHITECTURE.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.5 |
+| Code baseline | `main` at `9cb8b91db2b05257199fb24024de45d0e4225b3b` |
 
 ---
 
@@ -15,60 +15,69 @@
 
 This matrix records the security tests for the vault and maps them to the threats in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6. A threat or mitigation moves from `Implemented` to `Verified` only after its associated test has passed and the run evidence has been recorded here.
 
-The current repository has executable vault-storage tests. Authentication, RBAC, audit, API, and several configuration tests remain blocked or planned until the relevant modules are implemented.
+The current repository has executable crypto, vault-storage, and configuration-hardening tests. Authentication, RBAC, audit, API, validation, dependency-audit, and repository-governance tests remain blocked or planned until the relevant controls exist and evidence is recorded.
 
 ## 2. Conventions
 
-- **Test IDs** follow the threat model: `TC-01` through `TC-15`. `TC-16` is proposed only and is not part of the current formal register.
+- **Test IDs** follow the threat model: `TC-01` through `TC-23`.
 - **Threat IDs** use the STRIDE identifiers from the threat register (`S1`, `T1`, `I2`, and so on).
 - **Type:** `Unit` · `Integration` · `Security` · `E2E` · `Inspection`.
 - **Status:** `Not run` · `Pass` · `Fail` · `Blocked` · `Planned`.
-- **Blocked** means the required implementation or test location is not yet available.
-- **Planned** means the test design is identified but implementation work has not started.
+- **Blocked** means the required implementation, test location, or repository evidence is not yet available.
+- **Planned** means the test design is identified but implementation or verification work has not started.
 - **Test location** must contain a repository path and test function once the test exists.
 - After each run, update **Result**, **Status**, **Last run**, **Run by**, and **Commit** in the run log. Notify the threat-model owner when a threat status can change.
+- A proposed test is not formal coverage until it has a row here and is included in the threat-coverage table.
 
 ## 3. Test Cases
 
 | Test ID | Threat | Phase | What is tested | Type | Test location | Expected result | Result | Status | Last run |
 |---|---|---:|---|---|---|---|---|---|---|
-| TC-01 | S1 | 3 | Login protection: bcrypt hashes are stored instead of plaintext; repeated failures are rate-limited or locked; unknown-user and wrong-password responses are generic | Security | TBC — auth module | Passwords are not stored in plaintext; repeated attempts are refused; error responses do not disclose account existence | | Blocked | |
+| TC-01 | S1 | 3 | Login protection: bcrypt hashes are stored instead of plaintext; repeated failures are rate-limited or locked; unknown-user and wrong-password responses are generic | Security | TBC — auth module/tests | Passwords are not stored in plaintext; repeated attempts are refused; responses do not disclose account existence | | Blocked | |
 | TC-02 | S2 | 3 | JWT tampering: modified signature, `alg: none`, wrong signing secret, and expired token | Security | TBC — auth tests | All invalid tokens are rejected with 401 | | Blocked | |
-| TC-03 | T1 | 2 | One-byte modification of encrypted ciphertext in `{file_id}.bin` | Security | TBC — crypto tests | AES-GCM authentication fails; no plaintext is returned | | Blocked | |
+| TC-03 | T1 | 2 | One-byte modification of encrypted ciphertext in `{file_id}.bin` | Security | `tests/unit/test_crypto.py::test_tamper_detection` | AES-GCM authentication fails; no plaintext is returned | | Not run | |
 | TC-04 | T2 | 2 | Stored file and integrity hash are replaced together | Security | TBC — integrity/HMAC tests | Replacement is detected by authenticated integrity metadata; rollback remains separately documented as residual risk | | Planned | |
 | TC-05 | T3 | 4 | Audit-log entry is edited or deleted | Security | TBC — audit tests | Hash-chain or HMAC verification reports the broken or missing entry | | Blocked | |
 | TC-06 | R1 | 4 | Upload, download, and delete each create an audit event | Integration | TBC — API/audit tests | Each event includes user ID, role, timestamp, IP, and action | | Blocked | |
-| TC-07 | I1, I6 | 1 | `.env` is ignored and untracked; startup rejects missing/short JWT secrets, malformed/invalid-length encryption keys, non-HS256 algorithm values, and out-of-range token lifetimes | Inspection + Unit | `git ls-files .env`; `tests/unit/test_config.py::{test_missing_or_short_jwt_secret_rejected,test_invalid_encryption_key_format_or_length_rejected,test_non_hs256_algorithm_rejected,test_token_lifetime_out_of_range_rejected,test_valid_local_configuration_passes_validation,test_legacy_fernet_secret_key_fallback_supported}` | `.env` is not tracked; invalid configuration prevents startup with a clear safe error; valid local configuration loads safely | Pass | Pass | 2026-10-18 |
-| TC-08 | I2 | 2 | Traversal payloads, absolute paths, null bytes, and Windows-style paths | Unit | `tests/unit/test_vault.py::test_directory_traversal_mitigation`; `tests/unit/test_vault.py::test_null_byte_injection_blocked` | Input is rejected or reduced to a safe filename; no path escapes `vault_storage/` | Pass | Pass | 2026-10-18 |
+| TC-07 | I1, I6 | 1 | `.env` is ignored and untracked; startup rejects missing/short JWT secrets, malformed or invalid-length encryption keys, non-HS256 algorithm values, and out-of-range token lifetimes | Inspection + Unit | `tests/unit/test_config.py`; `.gitignore`; `app/config.py` | `.env` is not tracked; invalid configuration is rejected without exposing secrets | Pass | Verified | 2026-10-18 |
+| TC-08 | I2 | 2 | Traversal payloads, absolute paths, null bytes, and Windows-style paths | Unit | `tests/unit/test_vault.py::test_directory_traversal_mitigation`; `tests/unit/test_vault.py::test_null_byte_injection_blocked` | Input is rejected or reduced to a safe filename; no path escapes `vault_storage/` | Pass | Verified | 2026-10-18 |
 | TC-09 | I4 | 4 | Error responses for invalid input and server errors | Security | TBC — API tests | Responses do not expose stack traces, SQL, filesystem paths, or secrets; `/docs` handling matches the deployment decision | | Blocked | |
 | TC-10 | D1 | 4 | Oversized and repeated uploads | Security | TBC — API/rate-limit tests | Oversized files return 413 or equivalent; repeated requests are throttled | | Blocked | |
 | TC-11 | D2 | 4 | Executable content renamed with an allowed document extension | Security | TBC — validation tests | Magic-byte mismatch is rejected; the file is not stored or executed | | Blocked | |
 | TC-12 | E1 | 3 | Staff attempts Admin/Auditor operations and requests another role's file by ID | Security | TBC — RBAC/API tests | Every unauthorized request returns 403 and the attempt is logged | | Blocked | |
 | TC-13 | E2 | 3 | Role claim is changed from Staff to Admin inside a JWT | Security | TBC — auth/RBAC tests | Signature validation fails or the database role overrides the edited claim; access is denied | | Blocked | |
 | TC-14 | T4 | 3 | SQL injection payloads in login, search, and metadata fields | Security | TBC — database/API tests | No authentication bypass occurs and database contents remain unchanged | | Blocked | |
-| TC-15 | I5 | 2 | Ciphertext and metadata are stored separately and can be read back through the storage adapter | Unit | `tests/unit/test_vault.py::test_envelope_and_blob_storage_roundtrip`; `tests/unit/test_vault.py::test_nonexistent_blob_read_raises` | `.bin` and `.meta.json` are separate; round-trip returns the original stored bytes and envelope; missing files raise safely | Pass | Pass | 2026-10-18 |
-| TC-16 *(proposed)* | E1, T1, I5 | 4 | End-to-end login, upload, encryption, authorized download, and denied cross-role download | E2E | TBC — integration/API tests | Permitted role receives the original document; unauthorized role receives 403 | | Planned | |
+| TC-15 | I5 | 2 | Ciphertext and metadata are stored separately and can be read back through the storage adapter | Unit | `tests/unit/test_vault.py::test_envelope_and_blob_storage_roundtrip`; `tests/unit/test_vault.py::test_nonexistent_blob_read_raises` | `.bin` and `.meta.json` are separate; round-trip returns the stored bytes and envelope; missing files raise safely | Pass | Verified | 2026-10-18 |
+| TC-16 | E1, T1, I5 | 4 | End-to-end login, upload, encryption, authorized download, and denied cross-role download | E2E | TBC — integration/API tests | Permitted role receives the original document; unauthorized role receives 403 | | Planned | |
+| TC-17 | I7 | 2 | Repeated encryption of identical plaintext produces unique nonces and ciphertexts | Unit | `tests/unit/test_crypto.py::test_random_nonce_produces_unique_ciphertexts` | Each encryption uses a unique 96-bit nonce and decrypts successfully | Pass | Not recorded in run log | 2026-10-18 |
+| TC-18 | S3 | 3 | A copied JWT is replayed after logout or expiry; revocation behavior is checked | Security | TBC — auth tests | Expired or revoked token is rejected; tokens are not written to logs | | Planned | |
+| TC-19 | I8 | 4 | Audit events do not contain passwords, tokens, plaintext documents, or unnecessary sensitive data | Security | TBC — audit tests | Only approved event metadata is logged; sensitive values are absent | | Blocked | |
+| TC-20 | D3 | 4 | Repeated failed requests flood the audit log | Security | TBC — API/audit/rate-limit tests | Rate limiting and log controls prevent uncontrolled growth or loss of meaningful events | | Blocked | |
+| TC-21 | D4 | 4 | Missing, replaced, or corrupted encryption key; setup behavior with an existing `.env` | Security + Inspection | TBC — configuration/setup tests | Setup does not overwrite `.env`; invalid key prevents unsafe startup; recovery procedure is documented | | Planned | |
+| TC-22 | T5 | 3–4 | Dependency versions, known vulnerabilities, package integrity, and dependency-review process | Inspection + Security | TBC — `pip-audit`/dependency workflow | Security-sensitive dependencies are reviewed and pinned or constrained safely; known high-risk issues are addressed | | Planned | |
+| TC-23 | T6 | 4 | Branch protection, required reviews/checks, CODEOWNERS for workflows, action pinning, and MFA governance | Inspection | Repository settings and `.github/` configuration | Required repository controls are enabled and documented; workflow changes require review | | Not run | |
 
-> `TC-16` is proposed from the Phase 4 work breakdown. Before it is counted as formal coverage, add it to the threat register and update the threat-model summary consistently.
+> TC-16 through TC-23 were introduced with threat-model v0.6. TC-17 has source-test evidence, but its result is not yet recorded in the run log; the remaining tests are planned, blocked, or not run.
 
 ## 4. Current Evidence and Execution Guidance
 
-The following tests have source locations in the current repository and can be run now:
+The following commands can be run against the current repository:
 
 ```bash
-pytest tests/unit/test_vault.py -v
-pytest tests/unit/test_config.py -v
+python -m pytest tests/unit/test_config.py tests/unit/test_vault.py -v
+python -m pytest tests/unit/test_crypto.py -v
+python -m pytest tests/unit -v
 ```
 
 | Test ID | Current evidence | Action |
 |---|---|---|
-| TC-07 | `test_missing_or_short_jwt_secret_rejected`, `test_invalid_encryption_key_format_or_length_rejected`, `test_non_hs256_algorithm_rejected`, `test_token_lifetime_out_of_range_rejected`, `test_valid_local_configuration_passes_validation`, `test_legacy_fernet_secret_key_fallback_supported` | Run and record the result. |
-| TC-08 | `test_directory_traversal_mitigation` and `test_null_byte_injection_blocked` | Run and record the result. |
-| TC-15 | `test_envelope_and_blob_storage_roundtrip` and `test_nonexistent_blob_read_raises` | Run and record the result. |
+| TC-03 | `tests/unit/test_crypto.py::test_tamper_detection` | Run and record the result. |
+| TC-07 | Configuration-validation tests in `tests/unit/test_config.py`, `.gitignore`, and `app/config.py` | Confirm the recorded commit and environment-inspection evidence. |
+| TC-08 | `test_directory_traversal_mitigation` and `test_null_byte_injection_blocked` | Evidence is recorded for the listed run; retain output if rerun. |
+| TC-15 | `test_envelope_and_blob_storage_roundtrip` and `test_nonexistent_blob_read_raises` | Evidence is recorded for the listed run; retain output if rerun. |
+| TC-17 | `tests/unit/test_crypto.py::test_random_nonce_produces_unique_ciphertexts` | Add a run-log row before treating this test as Pass or Verified evidence. |
 
-The current repository also contains crypto implementations in `app/domains/crypto/aes_engine.py` and `app/domains/crypto/hasher.py`. Add concrete test locations for TC-03 and the remaining crypto tests when the corresponding test file is confirmed.
-
-Do not mark TC-03, TC-04, or any other test as `Pass` based only on source inspection. A test run and evidence are required.
+Do not mark a test `Pass` or a threat `Verified` based only on source inspection. A test run, result, executor, date, and commit evidence are required.
 
 ## 5. Threat Coverage
 
@@ -77,30 +86,39 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 | Threat | Short description | Risk | Test(s) | Coverage | Reason / next action |
 |---|---|---|---|---|---|
 | S1 | Password guessing / credential stuffing | High (9) | TC-01 | Planned | Auth service and rate limiting are TBC. |
-| S2 | Forged JWT | High (6) | TC-02 | Planned | Auth implementation is TBC. |
-| T1 | Ciphertext altered on disk | High (6) | TC-03, TC-16 | Planned | AES-GCM is implemented; tamper test and E2E flow remain to be added or located. |
+| S2 | Forged JWT | High (6) | TC-02 | Planned | Configuration controls exist; complete auth issuance and verification are TBC. |
+| S3 | Stolen JWT replay | High (6) | TC-18 | Planned | Revocation and replay handling are TBC. |
+| T1 | Ciphertext altered on disk | High (6) | TC-03, TC-16 | Implemented | AES-GCM and a tamper test exist; E2E integration remains planned. |
 | T2 | File and hash replaced / rollback | Medium (3) | TC-04 | Planned | HMAC protection is not implemented; rollback remains residual risk. |
 | T3 | Audit log edited or deleted | High (6) | TC-05 | Blocked | Audit logger and verification routine are TBC. |
 | T4 | SQL injection | High (6) | TC-14 | Blocked | Database/API implementation is TBC. |
+| T5 | Vulnerable or malicious dependency | High (6) | TC-22 | Planned | Dependency versions are not pinned and dependency audit is not yet configured. |
+| T6 | CI workflow or branch tampering | Medium (3) | TC-23 | Not run | Repository settings and CODEOWNERS evidence require inspection. |
 | R1 | User denies an action | Medium (4) | TC-06 | Blocked | Audit logger is TBC. |
-| I1 | Keys exposed through the repository | High (6) | TC-07 | Verified | `.env` is untracked and configuration validation tests passed for required key controls. |
-| I2 | Path traversal | High (6) | TC-08 | Verified | Vault path-defense tests passed in `tests/unit/test_vault.py`. |
+| I1 | Keys exposed through the repository | High (6) | TC-07 | Verified | `.env` is ignored and configuration-validation evidence is recorded. |
+| I2 | Path traversal | High (6) | TC-08 | Verified | Vault path-defense tests passed and are recorded. |
 | I3 | Interception in transit | High (6) | — | Not tested | HTTPS is a deployment requirement under the threat-model assumptions. |
 | I4 | Errors or API docs reveal internals | Low (2) | TC-09 | Blocked | API error behavior and production docs configuration are TBC; `/docs` is accepted for the demo. |
-| I5 | Stolen disk or backup | High (6) | TC-15, TC-16 | Partial | TC-15 passed for storage isolation; TC-16 remains planned. |
-| I6 | Master-key compromise | Medium (3) residual | TC-07 | Partial | Environment-only secret handling can be inspected; no HSM or per-file wrapping exists. |
+| I5 | Stolen disk or backup | High (6) | TC-15, TC-16 | Partial | Storage isolation is verified; complete upload/download integration remains planned. |
+| I6 | Master-key compromise | Medium (3) residual | TC-07 | Partial | Configuration validation exists; no HSM or per-file wrapping exists. |
+| I7 | AES-GCM nonce reuse | High (6) | TC-17 | Implemented | Nonce-uniqueness test exists; run evidence must be recorded. |
+| I8 | Sensitive audit-log content | Medium (4) | TC-19 | Blocked | Audit logger is TBC. |
 | D1 | Oversized or repeated uploads | Medium (4) | TC-10 | Blocked | Upload limits and rate limiting are TBC. |
 | D2 | Disguised file type | Medium (4) | TC-11 | Blocked | Magic-byte validation is TBC. |
+| D3 | Audit-log flooding | Medium (4) | TC-20 | Blocked | Audit logger, rotation, and rate limiting are TBC. |
+| D4 | Encryption-key loss | High (6) | TC-21 | Planned | Setup does not overwrite `.env`; backup, recovery, and canary checks are TBC. |
 | E1 | IDOR / cross-role access | High (9) | TC-12, TC-16 | Blocked | RBAC and API routes are TBC. |
-| E2 | Edited role claim | High (6) | TC-13 | Blocked | JWT and database-backed role loading are TBC. |
-| E3 | Insider administrator misuse | Medium (3) residual | — | Not tested | Residual risk mitigated by least privilege and planned audit review; no isolated automated test is currently defined. |
+| E2 | Edited role claim | High (6) | TC-13 | Blocked | Complete JWT and database-backed role loading are TBC. |
+| E3 | Insider administrator misuse | Medium (3) residual | — | Not tested | Residual risk mitigated by planned logging and least privilege. |
+| E4 | Direct SQLite role tampering | Medium (3) | TC-23 | Not run | File-permission and role-change audit evidence require implementation and inspection. |
 
 ## 6. Run Log
 
 | Date | Run by | Command | Total | Pass | Fail | Blocked | Commit | Notes |
 |---|---|---|---:|---:|---:|---:|---|---|
-| 2026-10-18 | Copilot | `python -m pytest tests/unit/test_config.py tests/unit/test_vault.py -v` | 22 | 22 | 0 | 0 | `f2f3078` | Added and ran TC-07 config validation tests plus existing TC-08/TC-15 vault tests. |
-| 2026-10-18 | Copilot | `python -m pytest tests/unit -v` | 42 | 42 | 0 | 0 | `f2f3078` | Full unit suite run after changes. |
+| 2026-10-18 | Copilot | `python -m pytest tests/unit/test_config.py tests/unit/test_vault.py -v` | 22 | 22 | 0 | 0 | `f2f3078` | Configuration, path-defense, and storage tests passed. |
+| 2026-10-18 | Copilot | `python -m pytest tests/unit -v` | 42 | 42 | 0 | 0 | `f2f3078` | Full unit suite passed after the security-hardening changes. |
+| 2026-10-18 | Copilot | `python -m pytest tests/unit/test_crypto.py -v` | TBC | TBC | TBC | TBC | TBC | Run and record before marking TC-03 or TC-17 Verified. |
 
 ## 7. Evidence Requirements
 
@@ -117,3 +135,4 @@ For every test marked `Pass`:
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | v0.1 | 2026-10-18 | D. Williams (draft for D. Sorathiya) | Corrected initial matrix to match the current threat register; separated executable vault tests from blocked/planned tests; documented exact current test locations, proposed TC-16 handling, and evidence requirements. |
+| v0.2 | 2026-10-19 | D. Williams | Synchronized with threat-model v0.6: added TC-16 through TC-23, corrected TC-03/TC-07/TC-08/TC-15 evidence mappings, updated linked document versions and baseline commit, and added coverage for new supply-chain, CI, replay, nonce, audit-log, key-loss, and SQLite-tampering threats. |
