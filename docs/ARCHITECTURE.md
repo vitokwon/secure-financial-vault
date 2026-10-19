@@ -5,9 +5,9 @@
 | Document owner | OhUk Kwon (Lead System Architect & Core Developer) |
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Current version | **v0.1 — Draft** |
-| Last updated | 2026-10-18 |
-| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.4 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.4 |
-| Code baseline | `main` at the documentation update commit |
+| Last updated | 2026-10-19 |
+| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.5 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.5 |
+| Code baseline | `main` at commit `a8c2a38432f6df47e7caf997171646b6eccd1d09` |
 
 > Items marked **TBC** require confirmation from the code owner before the final report export. This document distinguishes implemented repository components from planned application features.
 
@@ -17,22 +17,22 @@
 
 The intended vault is a FastAPI backend that allows authenticated users to upload and download financial documents according to a three-tier role model. The current repository implements the cryptographic and secure-storage foundations: AES-256-GCM encryption, SHA-256 integrity hashing, path-traversal defenses, and separated ciphertext/metadata persistence.
 
-Authentication, role-based authorization, audit logging, and complete API delivery remain planned or TBC unless marked as implemented in the source code and corresponding tests. Trust boundaries TB1–TB4 are defined in [`THREAT_MODEL.md`](THREAT_MODEL.md) §4.
+Configuration hardening is documented for the merged baseline: encryption-key validation, JWT-secret validation, HS256-only configuration, and bounded access-token lifetime. Authentication, role-based authorization, audit logging, and complete API delivery remain planned or TBC unless marked as implemented in the source code and corresponding tests. Trust boundaries TB1–TB4 are defined in [`THREAT_MODEL.md`](THREAT_MODEL.md) §4.
 
 ## 2. Technology Stack
 
 | Layer | Technology | Current status / notes |
 |---|---|---|
 | API | FastAPI, Swagger UI | Application scaffold exists; complete `/auth`, `/vault`, and `/audit` delivery is TBC. `/docs` is exposed for the demo only (F-06). |
-| Authentication | bcrypt password hashing; JWT signed with HS256 | Planned/TBC for full auth module. Configuration now enforces HS256 and short token TTL bounds. |
+| Authentication | bcrypt password hashing; JWT signed with HS256 | Full auth module is planned/TBC. Configuration enforces HS256 and short token-lifetime bounds. |
 | Authorization | Three-tier RBAC: Administrator, Compliance Auditor, General Staff | Planned/TBC. Role checks must be enforced server-side on every protected request. |
 | Encryption | AES-256-GCM in `app/domains/crypto/aes_engine.py` | Implemented. AES-GCM authenticates ciphertext and rejects modified payloads. |
-| Integrity | SHA-256 with constant-time comparison in `app/domains/crypto/hasher.py` | Implemented. HMAC protection of stored hashes is planned for T2. |
-| Metadata model | `EncryptedEnvelope` in `app/domains/vault/models.py` | Implemented for vault file metadata. Full SQLite metadata integration is TBC. |
+| Integrity | SHA-256 with constant-time comparison in `app/domains/crypto/hasher.py` | Implemented. HMAC protection of stored hashes remains planned for T2. |
+| Metadata model | `EncryptedEnvelope` in `app/domains/vault/models.py` | Implemented for vault-file metadata. Full SQLite metadata integration is TBC. |
 | File store | `vault_storage/` through `DiskVaultStorage` | Implemented. Stores `{file_id}.bin` ciphertext separately from `{file_id}.meta.json` metadata. |
 | Audit log | Append-only, hash-chained security-event log | Planned/TBC. Do not describe this as implemented until the logger and verification routine exist. |
-| Secrets | `.env` (git-ignored), `.env.example`, `setup.bat`, `app/config.py` | Implemented safeguards: startup rejects empty/weak secrets; setup halts when required secrets are blank. |
-| Dependency wiring | `app/dependencies.py` | Present in the project layout; complete production wiring is TBC. |
+| Secrets and configuration | `.env`, `.env.example`, `setup.bat`, `app/config.py` | Startup validation and setup guardrails are implemented in the merged security-hardening baseline. |
+| Dependency wiring | `app/dependencies.py` | Complete production wiring is TBC. |
 
 ## 3. Components
 
@@ -90,11 +90,11 @@ flowchart LR
 
 ### 4.2 SHA-256 Integrity Verification
 
-`Sha256Hasher` computes a SHA-256 digest and uses `hmac.compare_digest` for constant-time comparison. This protects against accidental or direct content modification when the expected digest is trusted. It does **not** by itself prevent an attacker from replacing both a file and its stored digest; HMAC protection and version records remain planned for T2.
+`Sha256Hasher` computes a SHA-256 digest and uses `hmac.compare_digest` for constant-time comparison. This does not prevent an attacker from replacing both a file and its stored digest; HMAC protection and version records remain planned for T2.
 
 ### 4.3 Vault Storage Isolation
 
-`DiskVaultStorage` confines paths to its resolved base directory. It rejects null bytes, canonicalizes untrusted names with `Path.name`, resolves the target path, and verifies that the result remains within the vault directory. Ciphertext and its `EncryptedEnvelope` metadata are stored as separate artifacts:
+`DiskVaultStorage` confines paths to its resolved base directory. It rejects null bytes, canonicalizes untrusted names with `Path.name`, resolves the target path, and verifies that the result remains within the vault directory.
 
 ```text
 vault_storage/{file_id}.bin
@@ -103,15 +103,17 @@ vault_storage/{file_id}.meta.json
 
 ### 4.4 Configuration and Setup Validation
 
-- `requirements.txt` explicitly includes `python-dotenv` because `app/config.py` uses `dotenv.load_dotenv`.
-- `setup.bat` creates/reuses `.venv`, installs dependencies, creates `.env` from `.env.example`, initializes `vault_storage`, and stops with a clear error if required steps fail.
-- `setup.bat` performs dependency and vault-module import checks, then blocks completion if required `.env` secrets are empty.
-- `app/config.py` validates:
-  - encryption key format as URL-safe base64 that decodes to exactly 32 bytes (AES-256-GCM requirement),
-  - JWT secret length (minimum 32 bytes),
-  - fixed `HS256` algorithm,
-  - access-token lifetime range of 1–15 minutes.
-- Configuration supports a backward-compatible key transition: `ENCRYPTION_KEY` is preferred and legacy `FERNET_SECRET_KEY` is accepted only when `ENCRYPTION_KEY` is unset.
+The merged security-hardening baseline documents and tests the following controls:
+
+- The encryption key is URL-safe Base64 and decodes to exactly 32 bytes for AES-256-GCM.
+- `JWT_SECRET_KEY` requires at least 32 bytes.
+- Only `HS256` is accepted for JWT configuration.
+- `ACCESS_TOKEN_EXPIRE_MINUTES` is limited to 1–15 minutes.
+- `ENCRYPTION_KEY` is preferred, with legacy `FERNET_SECRET_KEY` supported as a compatibility fallback.
+- `python-dotenv` is an explicit dependency for `dotenv.load_dotenv`.
+- `setup.bat` is Windows-specific and must not expose generated secret values.
+
+These controls harden configuration but do not constitute a complete authentication, RBAC, audit, or API implementation.
 
 ## 5. Key Request Flows
 
@@ -181,23 +183,23 @@ Target rules: users are pre-registered by an Administrator, users cannot change 
 | Control | Component | Threats | Findings | Tests | Current status |
 |---|---|---|---|---|---|
 | bcrypt hashing, lockout, and generic errors | Auth service | S1 | F-05 | TC-01 | Planned / TBC |
-| HS256 fixed in code, strong secret, and short expiry | Auth service/config | S2, E2 | F-01, F-02, F-07 | TC-02, TC-13 | Implemented in `app/config.py`; full auth flow tests remain planned |
+| HS256 fixed in code, strong secret, and short expiry | Configuration/auth | S2, E2 | F-01, F-02, F-07 | TC-02, TC-07, TC-13 | Configuration implemented; full auth-flow tests planned |
 | Role reloaded from DB and deny by default | RBAC guards | E1, E2 | — | TC-12, TC-13 | Planned / TBC |
-| AES-256-GCM authenticated encryption | Crypto engine | T1, I5 | F-04 | TC-03, TC-15 | Implemented; TC-15 storage-path evidence recorded, TC-03 tamper test mapping still pending matrix update |
+| AES-256-GCM authenticated encryption | Crypto engine | T1, I5 | F-04 | TC-03, TC-15 | Implemented; verification recorded in the test matrix where applicable |
 | HMAC-protected integrity hashes | Crypto engine | T2 | — | TC-04 | Planned |
 | Safe path resolution and confinement | Vault storage | I2 | F-08 | TC-08 | Verified with passing vault unit tests |
 | Separate ciphertext and metadata storage | Vault storage | I5 | F-09 | TC-15 | Verified with passing vault unit tests |
 | Parameterized queries / ORM | Database access | T4 | — | TC-14 | Planned / TBC |
 | Size limit, rate limiting, and magic-byte allowlist | Input validation | D1, D2 | — | TC-10, TC-11 | Planned / TBC |
 | Hash-chained append-only audit log | Audit logger | T3, R1 | — | TC-05, TC-06 | Planned / TBC |
-| Keys only in git-ignored `.env`, checked at startup | Configuration | I1, I6 | F-02, F-03, F-04 | TC-07 | Implemented startup validation and setup guardrails; environment hygiene test coverage in progress |
+| Keys only in git-ignored `.env`, checked at startup | Configuration | I1, I6 | F-02, F-03, F-04 | TC-07 | Implemented configuration validation; operational secret management remains residual |
 
 ## 8. Design Decisions
 
 | ID | Decision | Alternatives considered | Reason | Related |
 |---|---|---|---|---|
 | AD-01 | AES-256-GCM for file encryption | Fernet (AES-CBC + HMAC) | Authenticated encryption in one primitive and alignment with the design specification | T1, F-04 |
-| AD-02 | JWT algorithm fixed to HS256 in code | Algorithm from `.env` | Prevents algorithm selection from being controlled by deployment configuration | S2, F-01 |
+| AD-02 | JWT algorithm fixed to HS256 in code | Algorithm from `.env` | Prevents unsupported algorithm selection and algorithm-confusion configuration | S2, F-01 |
 | AD-03 | Reload role from the database on each protected request | Trust role claim in JWT | Role changes take effect immediately and edited claims cannot grant access | E2 |
 | AD-04 | Store ciphertext and metadata as separate files | Single combined file | Isolates the binary payload and validated metadata envelope | I5, F-09 |
 | AD-05 | Use bcrypt for passwords | PBKDF2, Argon2 | Salted and adaptive password hashing; final library choice remains subject to F-05 review | S1, F-05 |
@@ -213,9 +215,11 @@ Before the final report is exported, confirm:
 4. File-size limits, magic-byte rules, rate limiting, and API error-handling behavior.
 5. Whether the composition root is complete and all interfaces are wired into FastAPI dependencies.
 6. The final delete-document and audit-log permissions.
+7. That architecture and configuration claims remain aligned with `THREAT_MODEL.md` v0.5 and the test evidence in `TEST_MATRIX.md`.
 
 ## 10. Change Log
 
 | Version | Date | Author | Changes |
 |---|---|---|---|
-| v0.1 | 2026-10-18 | D. Williams (draft for O. Kwon) | Corrected initial architecture draft using the current repository paths; separated implemented crypto/storage foundations from planned auth, RBAC, validation, audit, and API components; added open architecture items. |
+| v0.1 | 2026-10-18 | D. Williams (draft for O. Kwon) | Corrected the architecture draft using current repository paths; separated implemented crypto/storage foundations from planned auth, RBAC, validation, audit, and API components. |
+| v0.1 | 2026-10-19 | D. Williams | Updated linked-document versions, recorded the current `main` baseline, and synchronized configuration-hardening details with threat model v0.5 and documentation guide v0.5. |
