@@ -1,67 +1,106 @@
 import base64
 import importlib
-import sys
 
 import pytest
 
 
-VALID_AES_KEY = base64.urlsafe_b64encode(b"a" * 32).decode("ascii")
-VALID_JWT_SECRET = "j" * 32
-CONFIG_ENV_KEYS = [
-    "FERNET_SECRET_KEY",
-    "JWT_SECRET_KEY",
-    "ALGORITHM",
-    "ACCESS_TOKEN_EXPIRE_MINUTES",
-]
+def _encoded_key(raw: bytes = b"a" * 32) -> str:
+    return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
 
 
-def _import_config_with_env(monkeypatch: pytest.MonkeyPatch, overrides: dict | None = None):
+def _load_config_module(monkeypatch, **env_overrides):
     defaults = {
-        "FERNET_SECRET_KEY": VALID_AES_KEY,
-        "JWT_SECRET_KEY": VALID_JWT_SECRET,
+        "ENCRYPTION_KEY": _encoded_key(),
+        "JWT_SECRET_KEY": "j" * 32,
         "ALGORITHM": "HS256",
         "ACCESS_TOKEN_EXPIRE_MINUTES": "15",
     }
-    for key in CONFIG_ENV_KEYS:
-        monkeypatch.delenv(key, raising=False)
+    defaults.update(env_overrides)
 
-    for key, value in {**defaults, **(overrides or {})}.items():
-        monkeypatch.setenv(key, str(value))
+    for key, value in defaults.items():
+        if value is None:
+            monkeypatch.delenv(key, raising=False)
+        else:
+            monkeypatch.setenv(key, value)
 
-    sys.modules.pop("app.config", None)
-    return importlib.import_module("app.config")
+    import app.config as config_module
 
-
-def test_valid_aes_key_and_valid_jwt_secret_accepted(monkeypatch):
-    config_module = _import_config_with_env(monkeypatch)
-
-    assert config_module.settings.algorithm == "HS256"
-    assert config_module.settings.access_token_expire_minutes == 15
+    return importlib.reload(config_module)
 
 
-def test_invalid_base64_aes_key_rejected(monkeypatch):
-    with pytest.raises(ValueError, match="valid URL-safe Base64"):
-        _import_config_with_env(monkeypatch, {"FERNET_SECRET_KEY": "not-valid-base64!!"})
+@pytest.mark.parametrize("jwt_secret", ["", "too-short-secret"])
+def test_missing_or_short_jwt_secret_rejected(monkeypatch, jwt_secret):
+    config_module = _load_config_module(monkeypatch)
+    settings = config_module.AppSettings(
+        encryption_key=_encoded_key(),
+        jwt_secret_key=jwt_secret,
+        algorithm="HS256",
+        access_token_expire_minutes=15,
+    )
+    with pytest.raises(ValueError, match="JWT_SECRET_KEY must be at least 32 bytes"):
+        settings.validate_keys()
 
 
-def test_aes_key_wrong_decoded_length_rejected(monkeypatch):
-    short_key = base64.urlsafe_b64encode(b"b" * 16).decode("ascii")
-
-    with pytest.raises(ValueError, match="decode to exactly 32 bytes"):
-        _import_config_with_env(monkeypatch, {"FERNET_SECRET_KEY": short_key})
-
-
-def test_jwt_secret_shorter_than_32_bytes_rejected(monkeypatch):
-    with pytest.raises(ValueError, match="at least 32 UTF-8 bytes"):
-        _import_config_with_env(monkeypatch, {"JWT_SECRET_KEY": "too-short"})
-
-
-def test_algorithm_other_than_hs256_rejected(monkeypatch):
+def test_non_hs256_algorithm_rejected(monkeypatch):
+    config_module = _load_config_module(monkeypatch)
+    settings = config_module.AppSettings(
+        encryption_key=_encoded_key(),
+        jwt_secret_key="j" * 32,
+        algorithm="none",
+        access_token_expire_minutes=15,
+    )
     with pytest.raises(ValueError, match="ALGORITHM must be HS256"):
-        _import_config_with_env(monkeypatch, {"ALGORITHM": "HS512"})
+        settings.validate_keys()
 
 
-@pytest.mark.parametrize("invalid_minutes", [0, 16])
-def test_access_token_lifetime_outside_range_rejected(monkeypatch, invalid_minutes):
-    with pytest.raises(ValueError, match="between 1 and 15"):
-        _import_config_with_env(monkeypatch, {"ACCESS_TOKEN_EXPIRE_MINUTES": invalid_minutes})
+@pytest.mark.parametrize("minutes", [0, 16])
+def test_token_lifetime_out_of_range_rejected(monkeypatch, minutes):
+    config_module = _load_config_module(monkeypatch)
+    settings = config_module.AppSettings(
+        encryption_key=_encoded_key(),
+        jwt_secret_key="j" * 32,
+        algorithm="HS256",
+        access_token_expire_minutes=minutes,
+    )
+    with pytest.raises(ValueError, match="ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 15"):
+        settings.validate_keys()
+
+
+@pytest.mark.parametrize(
+    "encryption_key",
+    [
+        "not-a-valid-base64-key",
+        _encoded_key(b"a" * 31),
+    ],
+)
+def test_invalid_encryption_key_format_or_length_rejected(monkeypatch, encryption_key):
+    config_module = _load_config_module(monkeypatch)
+    settings = config_module.AppSettings(
+        encryption_key=encryption_key,
+        jwt_secret_key="j" * 32,
+        algorithm="HS256",
+        access_token_expire_minutes=15,
+    )
+    with pytest.raises(ValueError, match="ENCRYPTION_KEY"):
+        settings.validate_keys()
+
+
+def test_valid_local_configuration_passes_validation(monkeypatch):
+    config_module = _load_config_module(monkeypatch)
+    settings = config_module.AppSettings(
+        encryption_key=_encoded_key(),
+        jwt_secret_key="j" * 32,
+        algorithm="HS256",
+        access_token_expire_minutes=15,
+    )
+    settings.validate_keys()
+
+
+def test_legacy_fernet_secret_key_fallback_supported(monkeypatch):
+    config_module = _load_config_module(
+        monkeypatch,
+        ENCRYPTION_KEY=None,
+        FERNET_SECRET_KEY=_encoded_key(),
+    )
+    settings = config_module.AppSettings()
+    settings.validate_keys()

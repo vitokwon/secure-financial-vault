@@ -8,8 +8,8 @@ This guide defines where project documents live, how they are versioned, and how
 
 | Document | File | Owner | Reviewer | Version | Status | Last updated |
 |---|---|---|---|---|---|---|
-| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.3 | Draft | 2026-10-18 |
-| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.3 | Draft | 2026-10-18 |
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.4 | Draft | 2026-10-18 |
+| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.4 | Draft | 2026-10-18 |
 | Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.1 | Draft | 2026-10-18 |
 | Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-18 |
 | Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
@@ -69,6 +69,7 @@ Suggested tags:
 - A document may describe planned or proposed work, but it must not describe unimplemented controls as implemented.
 - File paths, test locations, phase labels, and implementation statuses must be checked against the current repository before each report export.
 - If a test ID is marked as proposed, it must not be counted as formal threat coverage until it is added to the threat register and executed.
+- Review `requirements.txt`, setup scripts (`setup.bat`/platform equivalents), `.env.example`, and configuration code together; a change in one can invalidate setup or create unsafe defaults in the others.
 
 ## 6. Documentation and Security Rules
 
@@ -87,3 +88,4 @@ Suggested tags:
 | v0.1 | 2026-10-18 | D. Williams | Included the initial guide in the repository under `docs/` and synchronized the register with the current threat model version (`v0.3`). |
 | v0.2 | 2026-10-18 | D. Williams | Expanded the register with reviewer, status, and last-updated fields; added presentation slides; registered draft `TEST_MATRIX.md` v0.1 and `ARCHITECTURE.md` v0.1; documented Word-to-PDF report export. |
 | v0.3 | 2026-10-18 | D. Williams | Added `docs/wbs.md` to the document register; added consistency rules for implementation status, test coverage, repository paths, and proposed test IDs; synchronized the guide with the current documentation set. |
+| v0.4 | 2026-10-18 | D. Williams | Added a cross-check rule requiring dependency manifests, setup scripts, `.env.example`, and configuration code to be reviewed together to prevent unsafe setup drift. |

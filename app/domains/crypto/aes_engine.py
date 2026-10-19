@@ -4,8 +4,10 @@ Concrete implementation of CipherEngineProtocol using AES-256-GCM (AEAD).
 """
 
 import os
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from app.domains.crypto.protocols import CipherEngineProtocol
 
 
@@ -39,10 +41,10 @@ class AesGcmCipherEngine(CipherEngineProtocol):
 
         # Cryptographically secure random 12-byte Nonce
         nonce = os.urandom(self.NONCE_SIZE_BYTES)
-        
+
         # AESGCM automatically appends a 16-byte authentication tag to the ciphertext
         ciphertext_with_tag = self._engine.encrypt(nonce, plain_text, associated_data=None)
-        
+
         return nonce + ciphertext_with_tag
 
     def decrypt(self, cipher_text: bytes) -> bytes:
@@ -63,4 +65,6 @@ class AesGcmCipherEngine(CipherEngineProtocol):
             return self._engine.decrypt(nonce, actual_ciphertext, associated_data=None)
         except InvalidTag as exc:
             # Raised when the ciphertext/tag has been modified or the key is wrong
-            raise ValueError("[SECURITY ALERT] Decryption failed: Data tampering or invalid key.") from exc
+            raise ValueError(
+                "[SECURITY ALERT] Decryption failed: Data tampering or invalid key."
+            ) from exc

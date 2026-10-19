@@ -3,8 +3,8 @@ app/domains/vault/models.py
 Data models and envelope structures for securely stored vault documents.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -15,12 +15,25 @@ class EncryptedEnvelope(BaseModel):
     """
 
     file_id: str = Field(..., description="Unique UUID identifying the stored file.")
-    original_filename: str = Field(..., min_length=1, max_length=255, description="Sanitized original document name.")
-    sha256_hash: str = Field(..., min_length=64, max_length=64, description="SHA-256 fingerprint of the raw plaintext.")
+    original_filename: str = Field(
+        ..., min_length=1, max_length=255, description="Sanitized original document name."
+    )
+    sha256_hash: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        description="SHA-256 fingerprint of the raw plaintext.",
+    )
     size_bytes: int = Field(..., ge=0, description="Size of the raw unencrypted file in bytes.")
-    content_type: str = Field(default="application/octet-stream", description="MIME type of the payload.")
-    owner_id: Optional[str] = Field(default=None, description="User identifier associated with document ownership.")
-    stored_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="UTC timestamp of ingestion.")
+    content_type: str = Field(
+        default="application/octet-stream", description="MIME type of the payload."
+    )
+    owner_id: str | None = Field(
+        default=None, description="User identifier associated with document ownership."
+    )
+    stored_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="UTC timestamp of ingestion."
+    )
 
     @field_validator("sha256_hash")
     @classmethod

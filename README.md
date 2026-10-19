@@ -4,7 +4,7 @@ Enterprise-grade document repository tailored for financial environments featuri
 
 > **Academic Context**: Master of Information Security (MCSC-6002), Humber Polytechnic  
 > **Target Due Date**: **Saturday, October 24, 2026 (23:59 EDT)**  
-> **Master Schedule**: Detailed 2-week sprint tasks & RACI checklist are tracked in **[docs/WBS.md](docs/WBS.md)**.
+> **Master Schedule**: Detailed 2-week sprint tasks & RACI checklist are tracked in **[docs/wbs.md](docs/wbs.md)**.
 
 ---
 
@@ -27,7 +27,7 @@ Enterprise-grade document repository tailored for financial environments featuri
 - [ ] **Phase 4: Audit & API Delivery (10/17 - 10/20)**: Tamper-resistant logger, FastAPI routers, Swagger UI
 - [ ] **Phase 5: Final Submission Sprint (10/20 - 10/24)**: Technical report (10%), live demo (25%), slides (5%)
 
-👉 *For individual daily task items and sprint deadlines, please see the full [Work Breakdown Structure (WBS)](docs/WBS.md).*
+👉 *For individual daily task items and sprint deadlines, please see the full [Work Breakdown Structure (WBS)](docs/wbs.md).*
 
 ---
 

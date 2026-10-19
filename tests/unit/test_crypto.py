@@ -4,21 +4,23 @@ Unit tests verifying AES-256-GCM cipher engine operations.
 """
 
 import os
-import pytest
-from app.domains.crypto.protocols import CipherEngineProtocol
-from app.domains.crypto.aes_engine import AesGcmCipherEngine
 
+import pytest
+
+from app.domains.crypto.aes_engine import AesGcmCipherEngine
 from app.domains.crypto.hasher import Sha256Hasher
-from app.domains.crypto.protocols import HashEngineProtocol
+from app.domains.crypto.protocols import CipherEngineProtocol, HashEngineProtocol
+
 
 # protocl test
 def test_cipher_protocol_conformance():
     """Verify that AesGcmCipherEngine satisfies CipherEngineProtocol."""
     key = os.urandom(32)
     engine = AesGcmCipherEngine(key=key)
-    
+
     # CipherEngineProtocol 규격을 통과했는지 런타임 검증
     assert isinstance(engine, CipherEngineProtocol)
+
 
 # aes crypto test
 def test_encryption_and_decryption_cycle():
@@ -51,6 +53,7 @@ def test_tamper_detection():
     with pytest.raises(ValueError, match="Decryption failed"):
         engine.decrypt(bytes(tampered_bytes))
 
+
 # Hasher test
 def test_hash_protocol_implementation():
     """Verify that Sha256Hasher satisfies HashEngineProtocol."""
@@ -76,6 +79,7 @@ def test_sha256_hash_computation_and_verification():
     tampered_data = b"CONFIDENTIAL_FINANCIAL_RECORD_2027"
     assert hasher.verify_hash(tampered_data, digest) is False
 
+
 """
 tests/unit/test_crypto.py
 Extended test suite covering Security QA edge cases and boundary defense.
@@ -85,17 +89,21 @@ Extended test suite covering Security QA edge cases and boundary defense.
 # Security QA Edge Cases Suite (Proposed by Dhruvi)
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("invalid_key", [
-    b"",                       # Empty byte sequence (0 bytes)
-    b"short_16_bytes!!",      # Under-sized key (16 bytes / AES-128)
-    b"a" * 31,                # Boundary check: 1 byte short (31 bytes)
-    b"a" * 33,                # Boundary check: 1 byte over (33 bytes)
-    b"a" * 64,                # Over-sized key (64 bytes)
-])
+
+@pytest.mark.parametrize(
+    "invalid_key",
+    [
+        b"",  # Empty byte sequence (0 bytes)
+        b"short_16_bytes!!",  # Under-sized key (16 bytes / AES-128)
+        b"a" * 31,  # Boundary check: 1 byte short (31 bytes)
+        b"a" * 33,  # Boundary check: 1 byte over (33 bytes)
+        b"a" * 64,  # Over-sized key (64 bytes)
+    ],
+)
 def test_invalid_key_length_rejection(invalid_key: bytes):
     """
     [Edge Case 1: Key Boundary Validation]
-    Ensure AesGcmCipherEngine strictly rejects master keys that are not 
+    Ensure AesGcmCipherEngine strictly rejects master keys that are not
     exactly 32 bytes (256 bits) during engine initialization.
     """
     with pytest.raises(ValueError, match="32-byte"):
@@ -105,7 +113,7 @@ def test_invalid_key_length_rejection(invalid_key: bytes):
 def test_wrong_key_decryption_rejected():
     """
     [Edge Case 2: Cryptographic Isolation & Integrity]
-    Verify that decrypting authenticated ciphertext with an invalid key 
+    Verify that decrypting authenticated ciphertext with an invalid key
     fails immediately due to authentication tag mismatch (AEAD property).
     """
     key_alice = os.urandom(32)
@@ -122,17 +130,20 @@ def test_wrong_key_decryption_rejected():
         engine_bob.decrypt(ciphertext)
 
 
-@pytest.mark.parametrize("invalid_payload", [
-    "plain_string_data",       # String primitive
-    123456789,                 # Integer primitive
-    {"key": "value"},          # Dictionary
-    ["list", "items"],         # List
-    None,                      # NoneType
-])
+@pytest.mark.parametrize(
+    "invalid_payload",
+    [
+        "plain_string_data",  # String primitive
+        123456789,  # Integer primitive
+        {"key": "value"},  # Dictionary
+        ["list", "items"],  # List
+        None,  # NoneType
+    ],
+)
 def test_non_byte_input_rejected(invalid_payload):
     """
     [Edge Case 3: Type Safety & Input Validation]
-    Verify that non-byte types are rejected with a TypeError at the entry 
+    Verify that non-byte types are rejected with a TypeError at the entry
     boundary for both encryption and decryption pipelines.
     """
     key = os.urandom(32)
@@ -147,15 +158,18 @@ def test_non_byte_input_rejected(invalid_payload):
         engine.decrypt(invalid_payload)
 
 
-@pytest.mark.parametrize("malformed_payload", [
-    b"",                       # 0 bytes (Empty payload)
-    b"too_short",              # 9 bytes (Header truncated)
-    os.urandom(27),            # 27 bytes (1 byte short of minimum 28-byte GCM payload)
-])
+@pytest.mark.parametrize(
+    "malformed_payload",
+    [
+        b"",  # 0 bytes (Empty payload)
+        b"too_short",  # 9 bytes (Header truncated)
+        os.urandom(27),  # 27 bytes (1 byte short of minimum 28-byte GCM payload)
+    ],
+)
 def test_malformed_ciphertext_rejected(malformed_payload: bytes):
     """
     [Edge Case 4: Truncated Payload Defense]
-    Verify that ciphertexts shorter than the minimum header size 
+    Verify that ciphertexts shorter than the minimum header size
     (12-byte Nonce + 16-byte Auth Tag = 28 bytes) are rejected before decryption.
     """
     key = os.urandom(32)
@@ -168,7 +182,7 @@ def test_malformed_ciphertext_rejected(malformed_payload: bytes):
 def test_random_nonce_produces_unique_ciphertexts():
     """
     [Edge Case 5: CSPRNG Entropy Verification]
-    Verify that encrypting identical plaintext multiple times yields unique 
+    Verify that encrypting identical plaintext multiple times yields unique
     ciphertexts and unique nonces, preventing replay attacks and pattern leakage.
     """
     key = os.urandom(32)
