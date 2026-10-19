@@ -6,7 +6,7 @@
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Current version | **v0.1 — Draft** |
 | Last updated | 2026-10-18 |
-| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.3 · [`ARCHITECTURE.md`](ARCHITECTURE.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) |
+| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.4 · [`ARCHITECTURE.md`](ARCHITECTURE.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.4 |
 | Code baseline | `main` at the documentation update commit |
 
 ---
@@ -38,15 +38,15 @@ The current repository has executable vault-storage tests. Authentication, RBAC,
 | TC-04 | T2 | 2 | Stored file and integrity hash are replaced together | Security | TBC — integrity/HMAC tests | Replacement is detected by authenticated integrity metadata; rollback remains separately documented as residual risk | | Planned | |
 | TC-05 | T3 | 4 | Audit-log entry is edited or deleted | Security | TBC — audit tests | Hash-chain or HMAC verification reports the broken or missing entry | | Blocked | |
 | TC-06 | R1 | 4 | Upload, download, and delete each create an audit event | Integration | TBC — API/audit tests | Each event includes user ID, role, timestamp, IP, and action | | Blocked | |
-| TC-07 | I1, I6 | 1 | `.env` is ignored and untracked; startup rejects missing, short, or malformed secrets | Inspection + Unit | `git ls-files .env`; TBC config test | `.env` is not tracked; invalid configuration prevents startup with a clear safe error | | Not run | |
-| TC-08 | I2 | 2 | Traversal payloads, absolute paths, null bytes, and Windows-style paths | Unit | `tests/unit/test_vault.py::test_directory_traversal_mitigation`; `tests/unit/test_vault.py::test_null_byte_injection_blocked` | Input is rejected or reduced to a safe filename; no path escapes `vault_storage/` | | Not run | |
+| TC-07 | I1, I6 | 1 | `.env` is ignored and untracked; startup rejects missing/short JWT secrets, malformed/invalid-length encryption keys, non-HS256 algorithm values, and out-of-range token lifetimes | Inspection + Unit | `git ls-files .env`; `tests/unit/test_config.py::{test_missing_or_short_jwt_secret_rejected,test_invalid_encryption_key_format_or_length_rejected,test_non_hs256_algorithm_rejected,test_token_lifetime_out_of_range_rejected,test_valid_local_configuration_passes_validation,test_legacy_fernet_secret_key_fallback_supported}` | `.env` is not tracked; invalid configuration prevents startup with a clear safe error; valid local configuration loads safely | Pass | Pass | 2026-10-18 |
+| TC-08 | I2 | 2 | Traversal payloads, absolute paths, null bytes, and Windows-style paths | Unit | `tests/unit/test_vault.py::test_directory_traversal_mitigation`; `tests/unit/test_vault.py::test_null_byte_injection_blocked` | Input is rejected or reduced to a safe filename; no path escapes `vault_storage/` | Pass | Pass | 2026-10-18 |
 | TC-09 | I4 | 4 | Error responses for invalid input and server errors | Security | TBC — API tests | Responses do not expose stack traces, SQL, filesystem paths, or secrets; `/docs` handling matches the deployment decision | | Blocked | |
 | TC-10 | D1 | 4 | Oversized and repeated uploads | Security | TBC — API/rate-limit tests | Oversized files return 413 or equivalent; repeated requests are throttled | | Blocked | |
 | TC-11 | D2 | 4 | Executable content renamed with an allowed document extension | Security | TBC — validation tests | Magic-byte mismatch is rejected; the file is not stored or executed | | Blocked | |
 | TC-12 | E1 | 3 | Staff attempts Admin/Auditor operations and requests another role's file by ID | Security | TBC — RBAC/API tests | Every unauthorized request returns 403 and the attempt is logged | | Blocked | |
 | TC-13 | E2 | 3 | Role claim is changed from Staff to Admin inside a JWT | Security | TBC — auth/RBAC tests | Signature validation fails or the database role overrides the edited claim; access is denied | | Blocked | |
 | TC-14 | T4 | 3 | SQL injection payloads in login, search, and metadata fields | Security | TBC — database/API tests | No authentication bypass occurs and database contents remain unchanged | | Blocked | |
-| TC-15 | I5 | 2 | Ciphertext and metadata are stored separately and can be read back through the storage adapter | Unit | `tests/unit/test_vault.py::test_envelope_and_blob_storage_roundtrip`; `tests/unit/test_vault.py::test_nonexistent_blob_read_raises` | `.bin` and `.meta.json` are separate; round-trip returns the original stored bytes and envelope; missing files raise safely | | Not run | |
+| TC-15 | I5 | 2 | Ciphertext and metadata are stored separately and can be read back through the storage adapter | Unit | `tests/unit/test_vault.py::test_envelope_and_blob_storage_roundtrip`; `tests/unit/test_vault.py::test_nonexistent_blob_read_raises` | `.bin` and `.meta.json` are separate; round-trip returns the original stored bytes and envelope; missing files raise safely | Pass | Pass | 2026-10-18 |
 | TC-16 *(proposed)* | E1, T1, I5 | 4 | End-to-end login, upload, encryption, authorized download, and denied cross-role download | E2E | TBC — integration/API tests | Permitted role receives the original document; unauthorized role receives 403 | | Planned | |
 
 > `TC-16` is proposed from the Phase 4 work breakdown. Before it is counted as formal coverage, add it to the threat register and update the threat-model summary consistently.
@@ -57,10 +57,12 @@ The following tests have source locations in the current repository and can be r
 
 ```bash
 pytest tests/unit/test_vault.py -v
+pytest tests/unit/test_config.py -v
 ```
 
 | Test ID | Current evidence | Action |
 |---|---|---|
+| TC-07 | `test_missing_or_short_jwt_secret_rejected`, `test_invalid_encryption_key_format_or_length_rejected`, `test_non_hs256_algorithm_rejected`, `test_token_lifetime_out_of_range_rejected`, `test_valid_local_configuration_passes_validation`, `test_legacy_fernet_secret_key_fallback_supported` | Run and record the result. |
 | TC-08 | `test_directory_traversal_mitigation` and `test_null_byte_injection_blocked` | Run and record the result. |
 | TC-15 | `test_envelope_and_blob_storage_roundtrip` and `test_nonexistent_blob_read_raises` | Run and record the result. |
 
@@ -81,11 +83,11 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 | T3 | Audit log edited or deleted | High (6) | TC-05 | Blocked | Audit logger and verification routine are TBC. |
 | T4 | SQL injection | High (6) | TC-14 | Blocked | Database/API implementation is TBC. |
 | R1 | User denies an action | Medium (4) | TC-06 | Blocked | Audit logger is TBC. |
-| I1 | Keys exposed through the repository | High (6) | TC-07 | Not run | Run repository and configuration inspection. |
-| I2 | Path traversal | High (6) | TC-08 | Test exists — run | Vault path defenses and test locations exist. |
+| I1 | Keys exposed through the repository | High (6) | TC-07 | Verified | `.env` is untracked and configuration validation tests passed for required key controls. |
+| I2 | Path traversal | High (6) | TC-08 | Verified | Vault path-defense tests passed in `tests/unit/test_vault.py`. |
 | I3 | Interception in transit | High (6) | — | Not tested | HTTPS is a deployment requirement under the threat-model assumptions. |
 | I4 | Errors or API docs reveal internals | Low (2) | TC-09 | Blocked | API error behavior and production docs configuration are TBC; `/docs` is accepted for the demo. |
-| I5 | Stolen disk or backup | High (6) | TC-15, TC-16 | Test exists — run | Separate blob/envelope storage exists; run the storage tests. |
+| I5 | Stolen disk or backup | High (6) | TC-15, TC-16 | Partial | TC-15 passed for storage isolation; TC-16 remains planned. |
 | I6 | Master-key compromise | Medium (3) residual | TC-07 | Partial | Environment-only secret handling can be inspected; no HSM or per-file wrapping exists. |
 | D1 | Oversized or repeated uploads | Medium (4) | TC-10 | Blocked | Upload limits and rate limiting are TBC. |
 | D2 | Disguised file type | Medium (4) | TC-11 | Blocked | Magic-byte validation is TBC. |
@@ -97,7 +99,8 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 
 | Date | Run by | Command | Total | Pass | Fail | Blocked | Commit | Notes |
 |---|---|---|---:|---:|---:|---:|---|---|
-| YYYY-MM-DD | | `pytest tests/unit/test_vault.py -v` | | | | | | |
+| 2026-10-18 | Copilot | `python -m pytest tests/unit/test_config.py tests/unit/test_vault.py -v` | 22 | 22 | 0 | 0 | `f2f3078` | Added and ran TC-07 config validation tests plus existing TC-08/TC-15 vault tests. |
+| 2026-10-18 | Copilot | `python -m pytest tests/unit -v` | 42 | 42 | 0 | 0 | `f2f3078` | Full unit suite run after changes. |
 
 ## 7. Evidence Requirements
 

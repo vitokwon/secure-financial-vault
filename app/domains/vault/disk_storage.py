@@ -5,6 +5,7 @@ Production-grade isolated disk storage implementation featuring strict canonical
 
 import json
 from pathlib import Path
+
 from app.domains.vault.models import EncryptedEnvelope
 from app.domains.vault.protocols import VaultStorageProtocol
 
@@ -49,7 +50,9 @@ class DiskVaultStorage(VaultStorageProtocol):
 
         # Defense 4: Sandbox confinement verification
         if not target_path.is_relative_to(self.base_path):
-            raise PermissionError("[SECURITY ALERT] Path traversal attempt detected outside vault sandbox.")
+            raise PermissionError(
+                "[SECURITY ALERT] Path traversal attempt detected outside vault sandbox."
+            )
 
         return target_path
 
@@ -87,7 +90,7 @@ class DiskVaultStorage(VaultStorageProtocol):
             encrypted_bytes = f_bin.read()
 
         # 3. Read the metadata JSON and restore it back into an EncryptedEnvelope object!
-        with open(meta_path, "r", encoding="utf-8") as f_meta:
+        with open(meta_path, encoding="utf-8") as f_meta:
             envelope_data = json.load(f_meta)
             envelope = EncryptedEnvelope.model_validate(envelope_data)
 

@@ -7,6 +7,8 @@
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
 | Current version | **v0.4 — Draft** |
+| Last updated | 2026-10-18 |
+| Code baseline reviewed | Current scaffold + security setup/config hardening (`app/main.py`, `app/config.py`, `.env.example`, `requirements.txt`, `setup.bat`) |
 | Last updated | 2026-10-19 |
 | Code baseline reviewed | Main baseline at commit `10f7a2c87575d4ea1be51185d9b906e7a8218b89`: crypto engine (`app/domains/crypto/aes_engine.py`), hasher (`app/domains/crypto/hasher.py`), vault storage (`app/domains/vault/disk_storage.py`), configuration (`app/config.py`, `.env.example`, `requirements.txt`), unit tests, and CI workflows (`.github/workflows/code-quality.yml`, `.github/workflows/threat-model-review.yml`) |
 | Methodology | STRIDE per component, Likelihood × Impact risk rating |
@@ -93,7 +95,7 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | I2 | Info disclosure | Path traversal via filename (`../../`) | TB1 / A1 | 2 | 3 | **High (6)** | `DiskVaultStorage.resolve_safe_path()` rejects null bytes, strips directory components via `Path(...).name`, resolves against vault base path, and enforces confinement with `is_relative_to()` in `app/domains/vault/disk_storage.py` | Implemented (unit-test evidence in `tests/unit/test_vault.py`: `test_directory_traversal_mitigation`, `test_null_byte_injection_blocked`) | TC-08 | Show rejection |
 | I3 | Info disclosure | Data or tokens intercepted in transit | TB1 / A1, A3 | 2 | 3 | **High (6)** | HTTPS/TLS (documented as deployment requirement for demo) | Planned | — | No |
 | I4 | Info disclosure | Error messages or API docs reveal internals | TB1 | 2 | 1 | **Low (2)** | Generic errors; debug off; disable `/docs` in production | Open (see F-06) | TC-09 | No |
-| I5 | Info disclosure | Stolen disk or backup exposes stored documents | TB3 / A1 | 2 | 3 | **High (6)** | Isolated vault persistence stores ciphertext and metadata separately (`{file_id}.bin` + `{file_id}.meta.json`) through `save_blob()` / `read_blob()` in `app/domains/vault/disk_storage.py`, with envelope schema in `app/domains/vault/models.py` | Implemented (unit-test evidence in `tests/unit/test_vault.py`: `test_envelope_and_blob_storage_roundtrip`, `test_nonexistent_blob_read_raises`) | TC-15 | Show ciphertext on disk |
+| I5 | Info disclosure | Stolen disk or backup exposes stored documents | TB3 / A1 | 2 | 3 | **High (6)** | Isolated vault persistence stores ciphertext and metadata separately (`{file_id}.bin` + `{file_id}.meta.json`) through `save_blob()` / `read_blob()` in `app/domains/vault/disk_storage.py`, with envelope schema in `app/domains/vault/models.py` | Verified for storage isolation (TC-15 pass); E2E residual coverage remains planned via TC-16 | TC-15 | Show ciphertext on disk |
 | I6 | Info disclosure | Server compromise reads the single master key, exposing every file | TB2 / A2 | 1 | 3 | **Medium (3) — residual** | Key in environment, never in repo or DB; rotation plan; production would use a key vault / HSM | Planned | TC-07 | Describe only |
 | D1 | Denial of service | Oversized or repeated uploads exhaust disk/CPU | TB1 | 2 | 2 | **Medium (4)** | File-size limit; request rate limiting | Planned | TC-10 | Optional |
 | D2 | DoS / Tampering | Malicious file disguised by extension (e.g., `.exe` renamed `.pdf`) | TB1 / A1 | 2 | 2 | **Medium (4)** | Magic-byte allowlist; files never executed | Planned | TC-11 | Show rejection |
@@ -113,7 +115,7 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | F-04 | `config.py` | Key named `FERNET_SECRET_KEY` while design specifies AES-GCM; error message says "has been set" when key is missing | I1 | Low | Open |
 | F-05 | `requirements.txt` | `python-jose>=3.3.0` permits versions with published JWT vulnerabilities; `passlib` unmaintained; versions not pinned | S2, S1 | Medium | Open |
 | F-06 | `main.py` | `/docs` and `/redoc` always exposed | I4 | Low | Accepted for demo |
-| F-07 | `config.py` | Token lifetime 60 min; 15 min recommended for financial context | S2 | Low | Open |
+| F-07 | `config.py` | Access-token lifetime should be constrained to a short financial-context window | S2 | Low | Implemented (`ACCESS_TOKEN_EXPIRE_MINUTES` constrained to 1–15) |
 | F-08 | `app/domains/vault/disk_storage.py` | Path traversal hardening implemented: null-byte rejection, safe filename canonicalization, and base-directory confinement checks | I2 | High | Implemented (evidence: `tests/unit/test_vault.py`) |
 | F-09 | `app/domains/vault/disk_storage.py`, `app/domains/vault/models.py` | Vault storage isolation implemented: ciphertext blob and metadata envelope are stored as separate artifacts and validated on read | I5 | High | Implemented (evidence: `tests/unit/test_vault.py`) |
 | F-10 | `requirements.txt`, `config.py` | `python-dotenv` is imported by configuration but missing from dependency manifest; formalize dependency to avoid setup drift and inconsistent `.env` loading | I1 | Medium | Open |

@@ -32,6 +32,7 @@ class CipherEngineProtocol(Protocol):
         """
         ...
 
+
 @runtime_checkable
 class HashEngineProtocol(Protocol):
     """
@@ -56,4 +57,3 @@ class HashEngineProtocol(Protocol):
         :return: True if identical, False otherwise.
         """
         ...
-        

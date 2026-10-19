@@ -5,7 +5,6 @@ SHA-256 cryptographic hashing engine for integrity verification.
 
 import hashlib
 import hmac
-from app.domains.crypto.protocols import HashEngineProtocol
 
 
 class Sha256Hasher:
@@ -31,6 +30,6 @@ class Sha256Hasher:
             raise TypeError("Expected hash must be a string.")
 
         actual_hash = self.compute_hash(data)
-        
+
         # hmac.compare_digest prevents timing attacks by checking strings in constant time
         return hmac.compare_digest(actual_hash.lower(), expected_hash.lower())
