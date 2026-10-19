@@ -4,12 +4,12 @@ Domain models and schemas for Authentication and Role-Based Access Control (RBAC
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """
     3-Tier RBAC Roles for the Secure Financial Document Vault.
     """
