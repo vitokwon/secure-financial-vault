@@ -6,11 +6,9 @@
 |---|---|
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
-| Current version | **v0.4 — Draft** |
-| Last updated | 2026-10-18 |
-| Code baseline reviewed | Current scaffold + security setup/config hardening (`app/main.py`, `app/config.py`, `.env.example`, `requirements.txt`, `setup.bat`) |
+| Current version | **v0.5 — Draft** |
 | Last updated | 2026-10-19 |
-| Code baseline reviewed | Main baseline at commit `10f7a2c87575d4ea1be51185d9b906e7a8218b89`: crypto engine (`app/domains/crypto/aes_engine.py`), hasher (`app/domains/crypto/hasher.py`), vault storage (`app/domains/vault/disk_storage.py`), configuration (`app/config.py`, `.env.example`, `requirements.txt`), unit tests, and CI workflows (`.github/workflows/code-quality.yml`, `.github/workflows/threat-model-review.yml`) |
+| Code baseline reviewed | `main` at commit `a8c2a38432f6df47e7caf997171646b6eccd1d09`: crypto engine (`app/domains/crypto/aes_engine.py`), hasher (`app/domains/crypto/hasher.py`), vault storage (`app/domains/vault/disk_storage.py`), configuration hardening (`app/config.py`, `.env.example`, `requirements.txt`), tests (`tests/unit/test_config.py`, `tests/unit/test_crypto.py`, `tests/unit/test_vault.py`), setup (`setup.bat`), and CI workflows (`.github/workflows/code-quality.yml`, `.github/workflows/threat-model-review.yml`) |
 | Methodology | STRIDE per component, Likelihood × Impact risk rating |
 
 ---
@@ -85,17 +83,17 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | ID | STRIDE | Threat | Boundary / Asset | L | I | Risk | Mitigation | Status | Test ID | Demo |
 |---|---|---|---|---|---|---|---|---|---|---|
 | S1 | Spoofing | Password guessing or credential stuffing on login | TB1 / A4 | 3 | 3 | **High (9)** | bcrypt hashing; login rate limiting / lockout; generic error messages | Planned | TC-01 | Show lockout |
-| S2 | Spoofing | Forged JWT (weak secret, `alg: none`, algorithm confusion) | TB1 / A3 | 2 | 3 | **High (6)** | Current `app/config.py` still reads `ALGORITHM` from `.env`; HS256 enforcement, JWT secret-strength checks, and shorter expiry are required/planned hardening controls pending merge/test (F-01, F-02, F-07), plus dependency review (F-05) | **Open** (see F-01, F-02, F-05, F-07) | TC-02 | Optional |
+| S2 | Spoofing | Forged JWT (weak secret, `alg: none`, algorithm confusion) | TB1 / A3 | 2 | 3 | **High (6)** | Configuration hardening is implemented in `app/config.py`: only `HS256` is allowed, JWT secrets must be at least 32 bytes, and token lifetime is constrained to 1–15 minutes. Full JWT issuance/verification flow and database-backed role reload remain planned in the auth service | Planned (config controls implemented; full auth still TBC) | TC-02 | Optional |
 | T1 | Tampering | Ciphertext altered on disk | TB3 / A1 | 2 | 3 | **High (6)** | AES-GCM authentication tag rejects modified ciphertext before decryption | Implemented (unit-test evidence in `tests/unit/test_crypto.py::test_tamper_detection`) | TC-03 | Show tamper detection |
 | T2 | Tampering | File and stored hash both replaced, or older valid version restored (rollback) | TB3 / A5 | 1 | 3 | **Medium (3)** | `Sha256Hasher` currently uses plain SHA-256 with constant-time comparison only; HMAC-protected stored hashes plus version records remain planned. Rollback remains residual | Planned | TC-04 | Optional |
 | T3 | Tampering | Audit log entries edited or deleted | TB4 / A6 | 2 | 3 | **High (6)** | Hash-chained, HMAC-signed entries; log verification routine | Planned | TC-05 | Optional |
 | T4 | Tampering / Info disclosure | SQL injection through login, search or metadata fields | TB1, TB3 / A4, A5 | 2 | 3 | **High (6)** | Parameterized queries / ORM only; server-side input validation | Planned | TC-14 | Optional |
 | R1 | Repudiation | User denies uploading, downloading or deleting a file | TB4 / A6 | 2 | 2 | **Medium (4)** | Log user ID, role, timestamp, IP and action (accountability, not legal non-repudiation) | Planned | TC-06 | Show audit log |
-| I1 | Info disclosure | Encryption or JWT key exposed through the repository (committed `.env`, key in code) | TB2 / A2, A3 | 2 | 3 | **High (6)** | Repository control implemented: `.env` ignored in `.gitignore`. Runtime checks currently validate key presence only; key format/length and JWT algorithm validation remain open hardening work | **Open** (see F-01, F-02, F-04) | TC-07 | Describe only |
+| I1 | Info disclosure | Encryption or JWT key exposed through the repository (committed `.env`, key in code) | TB2 / A2, A3 | 2 | 3 | **High (6)** | `.env` is ignored in `.gitignore`; `ENCRYPTION_KEY` (with legacy `FERNET_SECRET_KEY` fallback) must be URL-safe Base64 decoding to exactly 32 bytes; `JWT_SECRET_KEY` must be at least 32 bytes; dependency for `.env` loading is declared in `requirements.txt`. Operational secret management (vault/HSM/rotation governance) remains outside prototype scope | Implemented (repository/config controls); operational controls remain planned | TC-07 | Describe only |
 | I2 | Info disclosure | Path traversal via filename (`../../`) | TB1 / A1 | 2 | 3 | **High (6)** | `DiskVaultStorage.resolve_safe_path()` rejects null bytes, strips directory components via `Path(...).name`, resolves against vault base path, and enforces confinement with `is_relative_to()` in `app/domains/vault/disk_storage.py` | Implemented (unit-test evidence in `tests/unit/test_vault.py`: `test_directory_traversal_mitigation`, `test_null_byte_injection_blocked`) | TC-08 | Show rejection |
 | I3 | Info disclosure | Data or tokens intercepted in transit | TB1 / A1, A3 | 2 | 3 | **High (6)** | HTTPS/TLS (documented as deployment requirement for demo) | Planned | — | No |
 | I4 | Info disclosure | Error messages or API docs reveal internals | TB1 | 2 | 1 | **Low (2)** | Generic errors; debug off; disable `/docs` in production | Open (see F-06) | TC-09 | No |
-| I5 | Info disclosure | Stolen disk or backup exposes stored documents | TB3 / A1 | 2 | 3 | **High (6)** | Isolated vault persistence stores ciphertext and metadata separately (`{file_id}.bin` + `{file_id}.meta.json`) through `save_blob()` / `read_blob()` in `app/domains/vault/disk_storage.py`, with envelope schema in `app/domains/vault/models.py` | Verified for storage isolation (TC-15 pass); E2E residual coverage remains planned via TC-16 | TC-15 | Show ciphertext on disk |
+| I5 | Info disclosure | Stolen disk or backup exposes stored documents | TB3 / A1 | 2 | 3 | **High (6)** | Isolated vault persistence stores ciphertext and metadata separately (`{file_id}.bin` + `{file_id}.meta.json`) through `save_blob()` / `read_blob()` in `app/domains/vault/disk_storage.py`, with envelope schema in `app/domains/vault/models.py` | Implemented (code/test evidence available); additional recorded run evidence and E2E coverage remain planned via TC-16 | TC-15 | Show ciphertext on disk |
 | I6 | Info disclosure | Server compromise reads the single master key, exposing every file | TB2 / A2 | 1 | 3 | **Medium (3) — residual** | Key in environment, never in repo or DB; rotation plan; production would use a key vault / HSM | Planned | TC-07 | Describe only |
 | D1 | Denial of service | Oversized or repeated uploads exhaust disk/CPU | TB1 | 2 | 2 | **Medium (4)** | File-size limit; request rate limiting | Planned | TC-10 | Optional |
 | D2 | DoS / Tampering | Malicious file disguised by extension (e.g., `.exe` renamed `.pdf`) | TB1 / A1 | 2 | 2 | **Medium (4)** | Magic-byte allowlist; files never executed | Planned | TC-11 | Show rejection |
@@ -103,22 +101,22 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | E2 | Elevation | User edits role claim in JWT | TB1 / A3 | 2 | 3 | **High (6)** | Signature verification; reload role from database per request | Planned | TC-13 | Optional |
 | E3 | Elevation | Insider admin misuses legitimate access | Whole system | 1 | 3 | **Medium (3) — residual** | Least privilege; separate key and storage duties; audit review | Planned | — | No |
 
-**Summary (v0.4):** 18 threats across all six STRIDE categories; 11 High, 6 Medium, 1 Low before mitigation.
+**Summary (v0.5):** 18 threats across all six STRIDE categories; 11 High, 6 Medium, 1 Low before mitigation.
 
-## 7. Code Review Findings (Baseline: `main@10f7a2c87575d4ea1be51185d9b906e7a8218b89`)
+## 7. Code Review Findings (Baseline: `main@a8c2a38432f6df47e7caf997171646b6eccd1d09`)
 
 | ID | File | Finding | Related threat | Severity | Status |
 |---|---|---|---|---|---|
-| F-01 | `config.py` | JWT algorithm read from `.env` (`ALGORITHM`); can be changed to a weak value | S2 | High | Open |
-| F-02 | `config.py` | Keys checked for presence only, not length or format | S2, I1 | Medium | Open |
+| F-01 | `config.py` | JWT configuration enforces `HS256` and rejects other values | S2 | High | Implemented |
+| F-02 | `config.py` | Key format and strength validation implemented: encryption key must decode to exactly 32 bytes and JWT secret must be at least 32 bytes | S2, I1 | Medium | Implemented |
 | F-03 | Repository | `.env` exclusion is present in `.gitignore`; keep this repository control enforced | I1 | High | Implemented |
-| F-04 | `config.py` | Key named `FERNET_SECRET_KEY` while design specifies AES-GCM; error message says "has been set" when key is missing | I1 | Low | Open |
+| F-04 | `config.py`, `.env.example` | AES key setting uses `ENCRYPTION_KEY` with legacy `FERNET_SECRET_KEY` fallback for compatibility; validation messages now describe AES-256-GCM key requirements | I1 | Low | Implemented |
 | F-05 | `requirements.txt` | `python-jose>=3.3.0` permits versions with published JWT vulnerabilities; `passlib` unmaintained; versions not pinned | S2, S1 | Medium | Open |
 | F-06 | `main.py` | `/docs` and `/redoc` always exposed | I4 | Low | Accepted for demo |
-| F-07 | `config.py` | Access-token lifetime should be constrained to a short financial-context window | S2 | Low | Implemented (`ACCESS_TOKEN_EXPIRE_MINUTES` constrained to 1–15) |
+| F-07 | `config.py` | Access-token lifetime is constrained to a short financial-context window (`ACCESS_TOKEN_EXPIRE_MINUTES` 1–15) | S2 | Low | Implemented |
 | F-08 | `app/domains/vault/disk_storage.py` | Path traversal hardening implemented: null-byte rejection, safe filename canonicalization, and base-directory confinement checks | I2 | High | Implemented (evidence: `tests/unit/test_vault.py`) |
 | F-09 | `app/domains/vault/disk_storage.py`, `app/domains/vault/models.py` | Vault storage isolation implemented: ciphertext blob and metadata envelope are stored as separate artifacts and validated on read | I5 | High | Implemented (evidence: `tests/unit/test_vault.py`) |
-| F-10 | `requirements.txt`, `config.py` | `python-dotenv` is imported by configuration but missing from dependency manifest; formalize dependency to avoid setup drift and inconsistent `.env` loading | I1 | Medium | Open |
+| F-10 | `requirements.txt`, `config.py` | `python-dotenv` dependency is now explicitly declared, matching configuration and setup expectations | I1 | Medium | Implemented |
 
 ## 8. Residual Risks
 
@@ -148,7 +146,8 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | v0.1 | 2026-10-12 | D. Williams | Initial draft: scope, assets, trust boundaries, 15 STRIDE threats, scaffold code review findings F-01 to F-07 |
 | v0.2 | 2026-10-12 | D. Williams | Risk bands aligned to 6–9 High / 3–4 Medium / 1–2 Low and scores shown; added T4 (SQL injection), I5 (stolen disk/backup), I6 (master key compromise); I1 narrowed to repository exposure; added Demo column, L/I definitions and ID conventions; tests TC-14, TC-15 added |
 | v0.3 | 2026-10-18 | D. Williams | Consolidated CI/security governance notes: documented Ruff/Bandit controls plus merged threat-model review workflow and vault mitigations for I2/I5 with unit-test evidence references |
-| v0.4 | 2026-10-19 | D. Williams | Reconciled this threat model with `main@10f7a2c87575d4ea1be51185d9b906e7a8218b89`; corrected configuration claims (S2/I1 and F-01/F-02/F-04/F-07 kept Open), updated TC-03 evidence mapping, added open dependency finding for `python-dotenv`, removed duplicate metadata/change-log rows, and refreshed version metadata |
+| v0.4 | 2026-10-19 | D. Williams | Reconciled threat model structure and evidence references during pre-merge review of security hardening changes; retained open configuration items pending merged baseline confirmation |
+| v0.5 | 2026-10-19 | D. Williams | Synchronized with merged PR #10 on `main@a8c2a38432f6df47e7caf997171646b6eccd1d09`; removed duplicate metadata rows, updated S2/I1 wording to separate implemented configuration enforcement from planned full auth/RBAC, and updated findings F-01/F-02/F-04/F-07/F-10 to Implemented while keeping remaining open/planned items unchanged |
 
 ## 12. Review Triggers
 
