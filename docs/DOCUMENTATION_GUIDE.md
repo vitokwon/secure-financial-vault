@@ -8,8 +8,8 @@ This guide defines where project documents live, how they are versioned, and how
 
 | Document | File | Owner | Reviewer | Version | Status | Last updated |
 |---|---|---|---|---|---|---|
-| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.6 | Draft | 2026-10-19 |
-| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.5 | Draft | 2026-10-19 |
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.7 | Draft | 2026-10-19 |
+| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.6 | Draft | 2026-10-19 |
 | Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.2 | Draft | 2026-10-19 |
 | Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-19 |
 | Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
@@ -95,3 +95,4 @@ Suggested tags:
 | v0.3 | 2026-10-18 | D. Williams | Added `docs/wbs.md` to the document register; added consistency rules for implementation status, test coverage, repository paths, and proposed test IDs; synchronized the guide with the current documentation set. |
 | v0.4 | 2026-10-18 | D. Williams | Added a cross-check rule requiring dependency manifests, setup scripts, `.env.example`, and configuration code to be reviewed together to prevent unsafe setup drift. |
 | v0.5 | 2026-10-19 | D. Williams | Synchronized the register and cross-document references with threat model v0.6, test matrix v0.2, and architecture v0.1; added baseline, risk-total, proposed-test, and implementation-status consistency rules. |
+| v0.6 | 2026-10-19 | D. Williams | Updated the document register for threat model v0.7 after adding the Semgrep CI scanning and suppression-policy documentation. |

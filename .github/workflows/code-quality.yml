@@ -5,20 +5,23 @@ on:
     paths:
       - "app/**"
       - "tests/**"
+      - ".github/workflows/**"
       - "*.py"
       - "pyproject.toml"
       - "requirements.txt"
-      - ".github/workflows/code-quality.yml"
+      - ".semgrep.yml"
+      - ".semgrepignore"
   push:
     branches:
       - main
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   code-quality-and-security:
-    name: Ruff and Bandit checks
+    name: Ruff, Bandit, and Semgrep checks
     runs-on: ubuntu-latest
 
     steps:
@@ -30,10 +33,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install tooling
+      - name: Install Ruff, Bandit, and Semgrep
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ruff bandit
+          python -m pip install ruff bandit semgrep==1.89.0
 
       - name: Run Ruff lint
         run: ruff check .
@@ -43,3 +46,28 @@ jobs:
 
       - name: Run Bandit security scan
         run: bandit --recursive app --severity-level medium
+
+      - name: Run Semgrep blocking scan (app + workflows)
+        run: |
+          semgrep scan \
+            --config .semgrep.yml \
+            --config p/python \
+            --config p/github-actions \
+            --error \
+            app .github/workflows
+
+      - name: Run Semgrep advisory scan (tests)
+        continue-on-error: true
+        run: |
+          semgrep scan \
+            --config .semgrep.yml \
+            --config p/python \
+            --sarif \
+            --output semgrep-tests.sarif \
+            tests
+
+      - name: Upload Semgrep advisory SARIF
+        if: always() && hashFiles('semgrep-tests.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-tests.sarif

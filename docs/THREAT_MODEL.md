@@ -6,7 +6,7 @@
 |---|---|
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
-| Current version | **v0.6 — Draft** |
+| Current version | **v0.7 — Draft** |
 | Last updated | 2026-10-19 |
 | Code baseline reviewed | `main` at commit `9cb8b91db2b05257199fb24024de45d0e4225b3b`; crypto engine, hasher, vault storage, configuration hardening, tests, setup, and CI workflows reviewed |
 | Methodology | STRIDE per element (§6.1), Likelihood × Impact risk rating before and after mitigation (§5, §6.2) |
@@ -235,6 +235,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v0.4 | 2026-10-19 | D. Williams | Reconciled threat model structure and evidence references during pre-merge review of security-hardening changes; retained open configuration items pending merged baseline confirmation |
 | v0.5 | 2026-10-19 | D. Williams | Synchronized with merged security hardening on `main@9cb8b91db2b05257199fb24024de45d0e4225b3b`; removed duplicate metadata rows, updated S2/I1 wording, and marked implemented configuration findings while retaining remaining open/planned items |
 | v0.6 | 2026-10-19 | D. Williams | Best-practice review: added threat actors, STRIDE-per-element coverage, supply-chain/CI/key-loss/database-tampering threats, mitigation tracking, residual-risk analysis, and proposed tests TC-16 through TC-23; corrected risk totals and reconciled setup claims with the current implementation. |
+| v0.7 | 2026-10-19 | D. Williams | Added Semgrep CI policy: blocking scans for `app/` and `.github/workflows/`, advisory scan for `tests/`, and narrowly scoped `nosemgrep` suppression guidance mapped to TC-22/T5/T6 without changing threat verification status. |
 
 ## 12. Review Triggers
 
@@ -251,5 +252,18 @@ The `code-quality.yml` workflow adds automated checks for:
 
 - **Ruff** for Python linting and formatting consistency.
 - **Bandit** for common insecure Python coding patterns.
+- **Semgrep** for repository-local and registry security patterns (application code and GitHub Actions workflows).
 
-These controls complement the existing `threat-model-review.yml` workflow, which enforces documentation updates when security-sensitive project files change. Ruff and Bandit reduce implementation risk, but they do **not** replace threat modeling, test coverage, or manual security review.
+Semgrep policy in CI is split by enforcement target:
+
+- **Blocking scan:** `app/` and `.github/workflows/` fail the check on actionable Semgrep findings.
+- **Advisory scan:** `tests/` runs with warning/SARIF output and does not block pull requests.
+- **Intentional test demonstrations:** use narrow `# nosemgrep: <rule-id>` suppressions with an adjacent explanation only for specific lines that intentionally model insecure inputs.
+
+Threat mapping:
+
+- Workflow and CI hardening coverage supports **T6 / TC-23**.
+- Application and code-pattern scanning supports **T5 / TC-22** evidence collection.
+- Semgrep improves detection coverage, but it does **not** by itself resolve dependency pinning, package selection, or supply-chain governance findings (for example F-05/F-12).
+
+These controls complement the existing `threat-model-review.yml` workflow, which enforces documentation updates when security-sensitive project files change. Ruff, Bandit, and Semgrep reduce implementation risk, but they do **not** replace threat modeling, test coverage, or manual security review.
