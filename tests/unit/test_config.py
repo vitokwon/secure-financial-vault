@@ -46,7 +46,8 @@ def test_non_hs256_algorithm_rejected(monkeypatch):
     settings = config_module.AppSettings(
         encryption_key=_encoded_key(),
         jwt_secret_key="j" * 32,
-        algorithm="none",
+        # Intentional insecure value for a negative validation test.
+        algorithm="none",  # nosemgrep: sfv.jwt.insecure-none-algorithm
         access_token_expire_minutes=15,
     )
     with pytest.raises(ValueError, match="ALGORITHM must be HS256"):
