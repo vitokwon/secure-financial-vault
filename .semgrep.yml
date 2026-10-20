@@ -1,0 +1,84 @@
+rules:
+  - id: sfv.jwt.insecure-none-algorithm
+    message: Do not allow JWT algorithm `none`; enforce a fixed strong algorithm such as HS256.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - app/**/*.py
+        - tests/**/*.py
+    pattern-either:
+      - pattern-regex: (?i)\balgorithm\s*=\s*["']none["']
+      - pattern-regex: (?i)\balgorithms\s*=\s*\[[^\]]*["']none["'][^\]]*\]
+
+  - id: sfv.jwt.decode-variable-algorithms
+    message: Avoid attacker-controlled JWT decode algorithms; pass a fixed allowlist literal.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - app/**/*.py
+        - tests/**/*.py
+    pattern-regex: jwt\.decode\([^)]*algorithms\s*=\s*[A-Za-z_][A-Za-z0-9_\.]*
+
+  - id: sfv.secrets.hardcoded-jwt-or-encryption-key
+    message: Potential hard-coded secret or key. Load secrets from environment or secret manager.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - app/**/*.py
+    pattern-regex: (?i)\b(jwt_secret|secret_key|encryption_key|fernet_secret_key|api_key|private_key)\b\s*=\s*["'][^"'\n]{20,}["']
+
+  - id: sfv.path-traversal.direct-open-from-parameter
+    message: Avoid opening filesystem paths directly from untrusted function parameters.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - app/**/*.py
+    patterns:
+      - pattern-inside: |
+          def $FUNC(..., $USER_PATH, ...):
+            ...
+      - metavariable-regex:
+          metavariable: $USER_PATH
+          regex: (?i).*(path|file|name|filename).*
+      - pattern: open($USER_PATH, ...)
+
+  - id: sfv.fastapi.explicit-empty-dependencies
+    message: FastAPI route uses `dependencies=[]`; confirm this endpoint is intentionally unauthenticated.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - app/**/*.py
+    pattern-either:
+      - pattern: |
+          @$APP.$METHOD(..., dependencies=[], ...)
+          def $FUNC(...):
+            ...
+      - pattern: |
+          @$ROUTER.$METHOD(..., dependencies=[], ...)
+          def $FUNC(...):
+            ...
+
+  - id: sfv.github-actions.untrusted-expression-in-run
+    message: Avoid interpolating untrusted GitHub context directly in `run` blocks. Pass through validated env vars.
+    severity: WARNING
+    languages: [yaml]
+    paths:
+      include:
+        - .github/workflows/*.yml
+        - .github/workflows/*.yaml
+    pattern-regex: run:\s*(\||>)?[\s\S]{0,800}\$\{\{\s*github\.event\.[^}]+\}\}
+
+  - id: sfv.github-actions.unpinned-third-party-action
+    message: Third-party GitHub Action should be pinned to a full commit SHA for supply-chain safety.
+    severity: WARNING
+    languages: [yaml]
+    paths:
+      include:
+        - .github/workflows/*.yml
+        - .github/workflows/*.yaml
+    pattern-regex: uses:\s*(?!actions\/|github\/codeql-action@)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@(?![0-9a-fA-F]{40})[^\s]+
