@@ -6,8 +6,8 @@
 |---|---|
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
-| Current version | **v0.7 — Draft** |
-| Last updated | 2026-10-19 |
+| Current version | **v0.8 — Draft** |
+| Last updated | 2026-10-20 |
 | Code baseline reviewed | `main` at commit `9cb8b91db2b05257199fb24024de45d0e4225b3b`; crypto engine, hasher, vault storage, configuration hardening, tests, setup, and CI workflows reviewed |
 | Methodology | STRIDE per element (§6.1), Likelihood × Impact risk rating before and after mitigation (§5, §6.2) |
 
@@ -235,7 +235,8 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v0.4 | 2026-10-19 | D. Williams | Reconciled threat model structure and evidence references during pre-merge review of security-hardening changes; retained open configuration items pending merged baseline confirmation |
 | v0.5 | 2026-10-19 | D. Williams | Synchronized with merged security hardening on `main@9cb8b91db2b05257199fb24024de45d0e4225b3b`; removed duplicate metadata rows, updated S2/I1 wording, and marked implemented configuration findings while retaining remaining open/planned items |
 | v0.6 | 2026-10-19 | D. Williams | Best-practice review: added threat actors, STRIDE-per-element coverage, supply-chain/CI/key-loss/database-tampering threats, mitigation tracking, residual-risk analysis, and proposed tests TC-16 through TC-23; corrected risk totals and reconciled setup claims with the current implementation. |
-| v0.7 | 2026-10-19 | D. Williams | Added Semgrep CI policy: blocking scans for `app/` and `.github/workflows/`, advisory scan for `tests/`, and narrowly scoped `nosemgrep` suppression guidance mapped to TC-22/T5/T6 without changing threat verification status. |
+| v0.7 | 2026-10-19 | O. Kwon | Updated Auth domain with StrEnum models, Bcrypt hasher, and trailing newline formatting |
+| v0.8 | 2026-10-20 | D. Williams | Added Semgrep CI policy: blocking scans for `app/` and `.github/workflows/`, advisory scan for `tests/`, and narrowly scoped `nosemgrep` suppression guidance mapped to TC-22/T5/T6 without changing threat verification status. |
 
 ## 12. Review Triggers
 
