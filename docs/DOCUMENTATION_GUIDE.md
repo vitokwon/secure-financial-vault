@@ -9,7 +9,7 @@ This guide defines where project documents live, how they are versioned, and how
 | Document | File | Owner | Reviewer | Version | Status | Last updated |
 |---|---|---|---|---|---|---|
 | Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v0.8 | Draft | 2026-10-20 |
-| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.7 | Draft | 2026-10-20 |
+| Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.8 | Draft | 2026-10-20 |
 | Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.2 | Draft | 2026-10-19 |
 | Architecture notes and diagram | `docs/ARCHITECTURE.md` + `docs/diagrams/` | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-19 |
 | Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
@@ -73,6 +73,7 @@ Suggested tags:
 - When a linked document changes version, update the Document Register and all cross-document version references in the same documentation change.
 - Reconcile threat counts, risk totals, baseline commit references, implementation statuses, and setup/configuration claims before each report export.
 - Do not mark a control `Verified` based on source inspection alone; record the test result, executor, date, and commit in `docs/TEST_MATRIX.md`.
+- If the threat model advances before the test matrix or other documentation updates are complete, record the new threat-model version in this guide and leave non-owned documents pending until their owners update them.
 
 ## 6. Documentation and Security Rules
 
@@ -97,3 +98,4 @@ Suggested tags:
 | v0.5 | 2026-10-19 | D. Williams | Synchronized the register and cross-document references with threat model v0.6, test matrix v0.2, and architecture v0.1; added baseline, risk-total, proposed-test, and implementation-status consistency rules. |
 | v0.6 | 2026-10-19 | D. Williams | Updated the document register for threat model v0.7 after adding the Semgrep CI scanning and suppression-policy documentation. |
 | v0.7 | 2026-10-20 | D. Williams | Synchronized the register with threat model v0.8 after resolving the PR merge conflict while preserving both prior v0.7 entries. |
+| v0.8 | 2026-10-20 | D. Williams | Documentation-guide-only synchronization: confirmed threat model remains at v0.8 and deferred test-matrix and other document updates to their owners. |
