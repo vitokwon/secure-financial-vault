@@ -11,7 +11,16 @@ exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "B008",  # Do not perform function call `Depends` in argument defaults (FastAPI standard)
+]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
