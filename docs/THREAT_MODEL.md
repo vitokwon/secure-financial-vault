@@ -6,8 +6,8 @@
 |---|---|
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
-| Current version | **v0.9 — Draft** |
-| Last updated | 2026-10-20 |
+| Current version | **v1.0 — Release Candidate** |
+| Last updated | 2026-10-21 |
 | Code baseline reviewed | `main` at commit `9cb8b91db2b05257199fb24024de45d0e4225b3b`; crypto engine, hasher, vault storage, configuration hardening, tests, setup, and CI workflows reviewed |
 | Methodology | STRIDE per element (§6.1), Likelihood × Impact risk rating before and after mitigation (§5, §6.2) |
 
@@ -238,6 +238,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v0.7 | 2026-10-19 | O. Kwon | Updated Auth domain with StrEnum models, Bcrypt hasher, and trailing newline formatting |
 | v0.8 | 2026-10-20 | D. Williams | Added Semgrep CI policy: blocking scans for `app/` and `.github/workflows/`, advisory scan for `tests/`, and narrowly scoped `nosemgrep` suppression guidance mapped to TC-22/T5/T6 without changing threat verification status. |
 | v0.9 | 2026-10-20 | O. Kwon | Phase 4 Security Telemetry: Implemented append-only FileAuditLogger, immutable AuditEvent models, and automatic credential redaction (mapped to STRIDE R1 non-repudiation and audit inspection controls) |
+| v1.0 | 2026-10-21 | O. Kwon | Phase 5 Integration: Wired composition root dependencies, verified 3-tier RBAC Swagger endpoints, added automated E2E integration test suite, and documented verification guide |
 
 ## 12. Review Triggers
 
