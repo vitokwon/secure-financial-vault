@@ -1,9 +1,19 @@
+"""
+app/main.py
+Application Entrypoint: Configures FastAPI application lifecycle, registers domain routers,
+and exposes OpenAPI documentation.
+"""
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.domains.auth.router import router as auth_router
+from app.domains.vault.router import router as vault_router
+from app.telemetry.router import router as audit_router
 
 
 @asynccontextmanager
@@ -26,11 +36,34 @@ async def lifespan(app: FastAPI):
 # Initialize the primary FastAPI application instance
 app = FastAPI(
     title=settings.project_name,
-    openapi_url=f"{settings.api_v1_str}/openapi.json",
+    description="Enterprise-grade financial vault featuring AES-256-GCM encryption at rest, "
+    "SHA-256 integrity verification, 3-tier JWT RBAC, and tamper-resistant audit trails.",
+    version="1.0.0",
     docs_url=f"{settings.api_v1_str}/docs",
     redoc_url=f"{settings.api_v1_str}/redoc",
+    openapi_url=f"{settings.api_v1_str}/openapi.json",
     lifespan=lifespan,
 )
+
+# Standard Security Middlewares
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount Domain Routers
+app.include_router(auth_router, prefix=settings.api_v1_str)
+app.include_router(vault_router, prefix=settings.api_v1_str)
+app.include_router(audit_router, prefix=settings.api_v1_str)
 
 
 @app.get("/health", tags=["System Telemetry"])
