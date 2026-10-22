@@ -119,6 +119,10 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 | 2026-10-18 | Copilot | `python -m pytest tests/unit/test_config.py tests/unit/test_vault.py -v` | 22 | 22 | 0 | 0 | `f2f3078` | Configuration, path-defense, and storage tests passed. |
 | 2026-10-18 | Copilot | `python -m pytest tests/unit -v` | 42 | 42 | 0 | 0 | `f2f3078` | Full unit suite passed after the security-hardening changes. |
 | 2026-10-18 | Copilot | `python -m pytest tests/unit/test_crypto.py -v` | TBC | TBC | TBC | TBC | TBC | Run and record before marking TC-03 or TC-17 Verified. |
+| 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/test_crypto.py -v` | 20 | 20 | 0 | 0 | TBC | Independent local QA execution; crypto suite passed 20/20. |
+| 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/test_vault.py -v` | 13 | 13 | 0 | 0 | TBC | Independent local QA execution; vault storage and path-defense suite passed 13/13. |
+| 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/ -v` | 49 | 49 | 0 | 0 | `10a7ecd` | Auth/RBAC validation completed after latest PR #13 update; all 49 tests passed. |
+| 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/ -v` | 53 | 53 | 0 | 0 | `c68d20e` | Final local QA run including audit/telemetry; 53/53 tests passed. `python -m ruff check .` also reported `All checks passed!`. |
 
 ## 7. Evidence Requirements
 
@@ -136,3 +140,4 @@ For every test marked `Pass`:
 |---|---|---|---|
 | v0.1 | 2026-10-18 | D. Williams (draft for D. Sorathiya) | Corrected initial matrix to match the current threat register; separated executable vault tests from blocked/planned tests; documented exact current test locations, proposed TC-16 handling, and evidence requirements. |
 | v0.2 | 2026-10-19 | D. Williams | Synchronized with threat-model v0.6: added TC-16 through TC-23, corrected TC-03/TC-07/TC-08/TC-15 evidence mappings, updated linked document versions and baseline commit, and added coverage for new supply-chain, CI, replay, nonce, audit-log, key-loss, and SQLite-tampering threats. |
+| v0.3 | 2026-10-22 | Dhruvi Sorathiya | Added independent QA execution evidence for crypto (20/20), vault (13/13), Auth/RBAC (49/49), and audit/telemetry (53/53), including Ruff validation results. |
