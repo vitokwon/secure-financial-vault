@@ -3,36 +3,41 @@
 ## 1. Overview & Architectural Scope
 This document outlines the step-by-step verification pipeline for the **Role-Based Secure Financial Document Vault**. It covers interactive validation via Swagger UI as well as automated regression testing through `pytest`.
 
-### Verified Security Controls:
-1. **Authentication & Token Lifecycle**: Salted Bcrypt password hashing and cryptographic HS256 JWT issuance with session expiration.
-2. **Confidentiality (Encryption at Rest)**: AES-256-GCM authenticated cipher with CSPRNG 12-byte nonces.
-3. **Integrity & Non-Repudiation**: Pre-encryption SHA-256 integrity fingerprinting and append-only audit telemetry (`audit.log`).
-4. **Tamper Resistance**: AEAD 16-byte authentication tag verification and bit-flipping detection.
-5. **Role-Based Access Control (RBAC)**: Strict role separation across `admin`, `auditor`, and `staff`.
-6. **Path Traversal Defense**: Strict directory containment and input sanitization (`resolve_safe_path`).
+### Verified Security Controls (Current Implementation)
+1. **Authentication & Token Lifecycle**: Salted Bcrypt password hashing and HS256 JWT issuance with expiration.
+2. **Confidentiality (Encryption at Rest)**: AES-256-GCM authenticated encryption for vault payloads.
+3. **Integrity Verification**: SHA-256 fingerprint computation on the **server side** during upload, then verification on download.
+4. **Audit Traceability (Prototype Level)**: Append-only JSONL audit logging with sensitive-field redaction.
+5. **Role-Based Access Control (RBAC)**: Role separation across `admin`, `auditor`, and `staff`.
+6. **Path Traversal Defense**: Isolated storage access through vault storage abstraction and file-id based retrieval.
+
+### Prototype / Demonstration Limitations
+- Authentication currently uses **in-memory seeded users** (`admin_user`, `auditor_user`, `staff_user`) rather than a persistent identity store.
+- The audit logger writes append-only JSON lines and redacts sensitive keys, but does **not** implement cryptographic hash chaining, HMAC signing, or external integrity attestation.
+- `/api/v1/vault/tamper-simulate/{file_id}` is a **demo-only endpoint** for forced ciphertext corruption testing.
 
 ---
 
-## 2. Interactive Verification Walkthrough (Swagger UI)ruff format .
+## 2. Interactive Verification Walkthrough (Swagger UI)
 
 Base URL: `http://127.0.0.1:8000/api/v1/docs`
 
 ---
 
-### Step 1. Staff Authentication & Bearer Token Issuance
-* **Endpoint**: `POST /api/v1/auth/login`
-* **Objective**: Authenticate as standard operational staff and receive a signed JWT access token.
-* **Request Payload**:
+### Step 1. Staff Authentication & Token Issuance
+- **Endpoint**: `POST /api/v1/auth/login`
+- **Objective**: Authenticate as staff and receive a signed JWT access token.
+- **Request Payload**:
   ```json
   {
     "username": "staff_user",
     "password": "AdminPass123!"
   }
   ```
-* **Execution**: Click **Try it out** -> Paste payload -> **Execute**.
-* **Expected Outcome**:
-  * **HTTP Status**: `200 OK`
-  * **Response Body**:
+- **Execution**: Click **Try it out** -> Paste payload -> **Execute**.
+- **Expected Outcome**:
+  - **HTTP Status**: `200 OK`
+  - **Response Body**:
     ```json
     {
       "access_token": "<JWT_STRING>",
@@ -41,23 +46,23 @@ Base URL: `http://127.0.0.1:8000/api/v1/docs`
       "username": "staff_user"
     }
     ```
-* **Authorization Setup**:
-  1. Copy the `access_token` string (excluding quotation marks).
-  2. Click the **Authorize 🔒** button at the top right of the Swagger UI.
-  3. Paste the token into the **Value** field and click **Authorize**, then **Close**.
+- **Authorization Setup**:
+  1. Copy `access_token`.
+  2. Click **Authorize 🔒** in Swagger UI.
+  3. Enter `****** and authorize.
 
 ---
 
-### Step 2. Authenticated Document Upload & AES-256-GCM Encryption
-* **Endpoint**: `POST /api/v1/vault/upload`
-* **Objective**: Upload a plaintext document to trigger client-side hashing, symmetric encryption, isolated disk persistence, and audit logging.
-* **Execution**:
+### Step 2. Authenticated Document Upload & Encryption
+- **Endpoint**: `POST /api/v1/vault/upload`
+- **Objective**: Upload plaintext; the server computes SHA-256, encrypts content, stores ciphertext/metadata, and records an audit event.
+- **Execution**:
   1. Expand `POST /api/v1/vault/upload` -> Click **Try it out**.
-  2. Under the `file` parameter, select a local document (e.g., `sample_upload.txt`).
+  2. Under `file`, select a local document (e.g., `sample_upload.txt`).
   3. Click **Execute**.
-* **Expected Outcome**:
-  * **HTTP Status**: `201 Created`
-  * **Response Payload**:
+- **Expected Outcome**:
+  - **HTTP Status**: `201 Created`
+  - **Response Payload**:
     ```json
     {
       "file_id": "<UUID_STRING>",
@@ -67,55 +72,56 @@ Base URL: `http://127.0.0.1:8000/api/v1/docs`
       "created_at": "<ISO8601_TIMESTAMP>"
     }
     ```
-* **Disk Persistence Verification**:
-  Check the `vault_storage/` directory in the project root:
-  * `{file_id}.bin`: Ciphertext binary stream encrypted via AES-256-GCM.
-  * `{file_id}.meta.json`: Envelope metadata containing original filename, owner, and SHA-256 digest.
-  * `audit.log`: Contains an append-only entry with event type `VAULT_UPLOAD`.
+- **Disk Persistence Verification**:
+  Check `vault_storage/` (or the configured `storage_dir`) for:
+  - `{file_id}.bin` (ciphertext)
+  - `{file_id}.meta.json` (metadata envelope)
+  - `audit.log` (appended JSONL record, e.g., `VAULT_UPLOAD`)
 
 ---
 
-### Step 3. Plaintext Document Retrieval & Roundtrip Verification
-* **Endpoint**: `GET /api/v1/vault/download/{file_id}`
-* **Objective**: Decrypt stored binary payload, verify SHA-256 checksum against recorded metadata, and stream original plaintext back to the client.
-* **Execution**:
-  1. Paste the generated `file_id` into the parameter field.
+### Step 3. Document Retrieval & Roundtrip Verification
+- **Endpoint**: `GET /api/v1/vault/download/{file_id}`
+- **Objective**: Decrypt ciphertext, verify SHA-256 against metadata, then stream original plaintext.
+- **Execution**:
+  1. Paste generated `file_id`.
   2. Click **Execute**.
-* **Expected Outcome**:
-  * **HTTP Status**: `200 OK`
-  * **Response Header**: `content-disposition: attachment; filename="sample_upload.txt"`
-  * **File Validation**: Click **Download file** and verify that the file contents match the original uploaded bytes exactly.
+- **Expected Outcome**:
+  - **HTTP Status**: `200 OK`
+  - **Response Header**: `content-disposition: attachment; filename="sample_upload.txt"`
+  - **File Validation**: Downloaded bytes should match uploaded bytes.
 
 ---
 
-### Step 4. Tamper Resistance Demonstration (Bit-Flipping Attack)
-* **Objective**: Demonstrate that any modification to stored ciphertext causes immediate decryption rejection via the AEAD authentication tag.
-* **Execution**:
-  1. Open the generated `{file_id}.bin` file in an editor.
-  2. Modify a single byte or character in the ciphertext and save (`Ctrl + S`).
-  3. Re-run `GET /api/v1/vault/download/{file_id}` in Swagger UI with the same `file_id`.
-* **Expected Outcome**:
-  * **HTTP Status**: `400 Bad Request`
-  * **Response Body**:
+### Step 4. Tamper Demonstration (Bit-Flipping Attack)
+- **Objective**: Show tamper detection on ciphertext modification.
+- **Execution (Manual file edit)**:
+  1. Open `{file_id}.bin` in `vault_storage/`.
+  2. Modify one byte and save.
+  3. Re-run `GET /api/v1/vault/download/{file_id}`.
+- **Alternative Demo Endpoint**:
+  - `POST /api/v1/vault/tamper-simulate/{file_id}`
+- **Expected Outcome**:
+  - **HTTP Status**: `400 Bad Request`
+  - **Response Body**:
     ```json
     {
       "detail": "Decryption failed. File may have been tampered with."
     }
     ```
-  * **Audit Log Trail**: Check `vault_storage/audit.log` to confirm an immutable entry with `event_type: "INTEGRITY_FAILURE"` was appended.
+  - **Audit Trail Check**: `audit.log` should contain an appended `INTEGRITY_FAILURE` record.
 
 ---
 
-### Step 5. 3-Tier RBAC Guard Verification (Privilege Enforcement)
-* **Endpoint**: `GET /api/v1/audit/logs`
-* **Objective**: Verify that non-privileged roles (`staff`) cannot access auditor/admin compliance endpoints.
-* **Execution**:
-  1. Keep the `staff_user` bearer token active in Swagger UI.
-  2. Expand `GET /api/v1/audit/logs` under **Security Telemetry & Compliance**.
-  3. Click **Execute** (with `limit=50`).
-* **Expected Outcome**:
-  * **HTTP Status**: `403 Forbidden`
-  * **Response Body**:
+### Step 5. RBAC Guard Verification (Privilege Enforcement)
+- **Endpoint**: `GET /api/v1/audit/logs`
+- **Objective**: Verify that `staff` cannot access auditor/admin audit-log endpoint.
+- **Execution**:
+  1. Keep `staff_user` token active.
+  2. Execute `GET /api/v1/audit/logs` (default `limit=50`).
+- **Expected Outcome**:
+  - **HTTP Status**: `403 Forbidden`
+  - **Response Body**:
     ```json
     {
       "detail": "Access denied: Role 'staff' lacks required permissions."
@@ -125,64 +131,56 @@ Base URL: `http://127.0.0.1:8000/api/v1/docs`
 ---
 
 ### Step 6. Auditor Access & Audit Log Retrieval
-* **Objective**: Authenticate as `auditor_user` and inspect the tamper-resistant security audit trail.
-* **Execution**:
-  1. Authenticate via `POST /api/v1/auth/login` using:
+- **Objective**: Authenticate as `auditor_user` and inspect audit records.
+- **Execution**:
+  1. Authenticate via `POST /api/v1/auth/login`:
      ```json
      {
        "username": "auditor_user",
        "password": "AdminPass123!"
      }
      ```
-  2. Update Swagger UI authorization by clicking **Authorize 🔒**, logging out, and applying the new auditor token.
-  3. Re-execute `GET /api/v1/audit/logs`.
-* **Expected Outcome**:
-  * **HTTP Status**: `200 OK`
-  * **Response Body**: A chronological list of audit records detailing:
-    * `AUTH_LOGIN_SUCCESS` (Logins for staff and auditor)
-    * `VAULT_UPLOAD` (Document creation metadata)
-    * `VAULT_DOWNLOAD` (Document retrieval access)
-    * `INTEGRITY_FAILURE` (Recorded tamper detection attempt)
+  2. Authorize with the auditor bearer token.
+  3. Execute `GET /api/v1/audit/logs`.
+- **Expected Outcome**:
+  - **HTTP Status**: `200 OK`
+  - **Response Body**: List of records (returned newest-first by current implementation), including events such as:
+    - `AUTH_LOGIN_SUCCESS`
+    - `VAULT_UPLOAD`
+    - `VAULT_DOWNLOAD`
+    - `INTEGRITY_FAILURE`
 
 ---
 
-### Step 7. Path Traversal Attack Mitigation
-* **Endpoint**: `GET /api/v1/vault/download/{file_id}`
-* **Objective**: Attempt sandbox escape via directory traversal sequences (`../../etc/passwd`).
-* **Execution**:
-  1. Enter `../../etc/passwd` or `..` into the `file_id` path parameter.
-  2. Click **Execute**.
-* **Expected Outcome**:
-  * **HTTP Status**: `404 Not Found` (Router rejection / Sandbox isolation)
-  * System boundary enforcement guarantees no file outside `vault_storage/` is exposed.
+### Step 7. Path Traversal / Invalid Identifier Handling
+- **Endpoint**: `GET /api/v1/vault/download/{file_id}`
+- **Objective**: Confirm non-existent or malicious identifiers do not expose arbitrary filesystem paths.
+- **Execution**:
+  1. Try invalid IDs (e.g., `not-a-real-id`, traversal-like inputs).
+  2. Execute request.
+- **Expected Outcome**:
+  - **HTTP Status**: `404 Not Found` when storage lookup fails.
+  - No file outside configured vault storage should be returned.
 
 ---
 
 ## 3. Automated Regression Testing (`pytest`)
 
-Automated test suites can be executed from the terminal without manual intervention.
+Use automated tests to validate behavior without manual UI steps.
 
-### 1. Run Complete Unit Test Suite
+### 1. Run Unit Test Suite
 ```powershell
-pytest tests/unit/ -v
+python -m pytest tests/unit/ -v
 ```
-* **Coverage**: Crypto cipher cycle, bit-flipping tamper detection, SHA-256 timing attack defense, Bcrypt hashing boundaries, and JWT lifecycle.
 
 ### 2. Run End-to-End Integration Suite
 ```powershell
-pytest tests/integration/test_api_flow.py -v
+python -m pytest tests/integration/test_api_flow.py -v
 ```
-* **Coverage**:
-  1. `test_full_security_workflow_integration`: Full workflow from authentication to compliance inspection.
-  2. `test_tampered_document_download_blocked`: Automated disk byte corruption and tamper rejection.
-  3. `test_auth_security_negative_cases`: Rejection of invalid credentials and forged JWT signatures.
 
-### 3. Pytest Configuration & Warning Suppression
-To ensure clean output during CI/CD runs, warning suppression is maintained in `pyproject.toml`:
-```toml
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-filterwarnings = [
-    "ignore::starlette.exceptions.StarletteDeprecationWarning",
-]
-```
+Current integration coverage includes:
+1. `test_full_security_workflow_integration`
+2. `test_tampered_document_download_blocked`
+3. `test_auth_security_negative_cases`
+
+> Note: This guide documents expected behavior based on current route and test implementations; execute the commands locally/CI to produce run evidence for submission records.
