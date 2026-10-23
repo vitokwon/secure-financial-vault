@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from app.config import settings
 from app.domains.auth.router import router as auth_router
@@ -76,3 +77,10 @@ async def health_check():
         "project": settings.project_name,
         "api_version": settings.api_v1_str,
     }
+
+
+# (기존 라우터 include 코드 아래에 추가)
+@app.get("/demo", response_class=HTMLResponse, tags=["Presentation Demo"])
+def render_live_demo_dashboard():
+    demo_file = Path(__file__).resolve().parent / "templates" / "demo.html"
+    return demo_file.read_text(encoding="utf-8")

@@ -204,3 +204,23 @@ def download_document(
         media_type=envelope.content_type,
         headers={"Content-Disposition": (f'attachment; filename="{envelope.original_filename}"')},
     )
+
+
+@router.post("/tamper-simulate/{file_id}", tags=["Vault"])
+def simulate_bit_flip_tampering(file_id: str):
+    """[Demo Only] Actually flips one byte of the ciphertext
+    within an actual .bin file stored on disk.
+    """
+    from app.dependencies import get_vault_storage
+
+    storage = get_vault_storage()
+    blob_path = storage.base_path / f"{file_id}.bin"
+    if not blob_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    data = bytearray(blob_path.read_bytes())
+    # Flip one bit (using ^= 1) of the first ciphertext byte
+    # (at index 12) following the 12-byte nonce.
+    data[12] ^= 0x01
+    blob_path.write_bytes(data)
+    return {"status": "success", "message": "1-bit flipped on disk at byte index 12"}
