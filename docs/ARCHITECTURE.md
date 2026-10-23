@@ -5,34 +5,34 @@
 | Document owner | OhUk Kwon (Lead System Architect & Core Developer) |
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Current version | **v0.1 — Draft** |
-| Last updated | 2026-10-19 |
-| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v0.6 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.2 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.5 |
-| Code baseline | `main` at `9cb8b91db2b05257199fb24024de45d0e4225b3b` |
+| Last updated | 2026-10-23 |
+| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v1.0 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.3 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.9 |
+| Code baseline | `main` at `ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5` |
 
-> Items marked **TBC** require confirmation from the code owner before the final report export. This document distinguishes implemented repository components from planned application features.
+> This document distinguishes implemented repository components from still-open prototype hardening items.
 
 ---
 
 ## 1. Overview
 
-The intended vault is a FastAPI backend that allows authenticated users to upload and download financial documents according to a three-tier role model. The current repository implements the cryptographic and secure-storage foundations: AES-256-GCM encryption, SHA-256 integrity hashing, path-traversal defenses, and separated ciphertext/metadata persistence.
+The intended vault is a FastAPI backend that allows authenticated users to upload and download financial documents according to a three-tier role model. The current repository implements the crypto and secure-storage foundation plus integrated API delivery: authentication login/JWT issuance, RBAC route guards, vault upload/download routes, telemetry routes, and composition-root dependency wiring.
 
-Configuration hardening is implemented for the documented baseline: encryption-key validation, JWT-secret validation, HS256-only configuration, and bounded access-token lifetime. Authentication, role-based authorization, audit logging, and complete API delivery remain planned or TBC unless marked as implemented in the source code and corresponding tests. Trust boundaries TB1–TB5 and the expanded threat coverage are defined in [`THREAT_MODEL.md`](THREAT_MODEL.md) §§4 and 6.1.
+The current implementation remains a prototype: users are in-memory seed records, there is no persistent user database, audit logging is append-only JSONL without cryptographic hash-chaining/HMAC verification, and file metadata integrity currently relies on plain SHA-256 rather than keyed integrity protection. Trust boundaries TB1–TB5 and expanded threat coverage are defined in [`THREAT_MODEL.md`](THREAT_MODEL.md) §§4 and 6.1.
 
 ## 2. Technology Stack
 
 | Layer | Technology | Current status / notes |
 |---|---|---|
-| API | FastAPI, Swagger UI | Application scaffold exists; complete `/auth`, `/vault`, and `/audit` delivery is TBC. `/docs` is exposed for the demo only (F-06). |
-| Authentication | bcrypt password hashing; JWT signed with HS256 | Full auth module is planned/TBC. Configuration enforces HS256 and short token-lifetime bounds. |
-| Authorization | Three-tier RBAC: Administrator, Compliance Auditor, General Staff | Planned/TBC. Role checks must be enforced server-side on every protected request. |
+| API | FastAPI, Swagger UI | `/auth`, `/vault`, and `/audit` routers are mounted in `app/main.py`. `/docs` is exposed for the demo only (F-06). |
+| Authentication | bcrypt password hashing; JWT signed with HS256 | Implemented login endpoint and JWT engine. Current user source is in-memory seed data in `app/domains/auth/router.py`. |
+| Authorization | Three-tier RBAC: Administrator, Compliance Auditor, General Staff | Implemented route-level role checks via `RequireRoles` in `app/dependencies.py`. |
 | Encryption | AES-256-GCM in `app/domains/crypto/aes_engine.py` | Implemented. AES-GCM authenticates ciphertext and rejects modified payloads. |
 | Integrity | SHA-256 with constant-time comparison in `app/domains/crypto/hasher.py` | Implemented. HMAC protection of stored hashes remains planned for T2. |
 | Metadata model | `EncryptedEnvelope` in `app/domains/vault/models.py` | Implemented for vault-file metadata. Full SQLite metadata integration is TBC. |
 | File store | `vault_storage/` through `DiskVaultStorage` | Implemented. Stores `{file_id}.bin` ciphertext separately from `{file_id}.meta.json` metadata. |
-| Audit log | Append-only, hash-chained security-event log | Planned/TBC. Do not describe this as implemented until the logger and verification routine exist. |
+| Audit log | Append-only JSONL event log | Implemented append-only `FileAuditLogger`; cryptographic tamper-proofing (hash chain/HMAC verification) remains open. |
 | Secrets and configuration | `.env`, `.env.example`, `setup.bat`, `app/config.py` | Implemented safeguards: startup rejects invalid/weak secrets; setup does not overwrite an existing `.env` and stops when required secrets are blank. |
-| Dependency wiring | `app/dependencies.py` | Complete production wiring is TBC. |
+| Dependency wiring | `app/dependencies.py` | Implemented composition root for cipher, hasher, storage, JWT, password hasher, audit logger, and RBAC dependencies. |
 | Repository and CI governance | `.github/workflows/`, branch settings, CODEOWNERS | Workflow-based documentation review exists; branch protection, CODEOWNERS, action pinning, and MFA require repository inspection (T6/TC-23). |
 
 ## 3. Components
@@ -43,14 +43,14 @@ flowchart LR
 
     subgraph Server [Application server]
         API[FastAPI application and routers]
-        AUTH[Auth service<br/>bcrypt + JWT HS256<br/>planned/TBC]
-        RBAC[RBAC guards<br/>Admin / Auditor / Staff<br/>planned/TBC]
+        AUTH[Auth service<br/>bcrypt + JWT HS256<br/>implemented with in-memory users]
+        RBAC[RBAC guards<br/>Admin / Auditor / Staff<br/>implemented on protected routes]
         VAL[Input validation<br/>size, magic bytes, filename<br/>planned/TBC]
         CRYPTO[Crypto domain<br/>AES-256-GCM + SHA-256]
         STORE[DiskVaultStorage<br/>safe path and isolated files]
-        AUDIT[Audit logger<br/>planned/TBC]
-        DB[(SQLite metadata<br/>planned/TBC)]
-        LOG[(Audit log<br/>planned/TBC)]
+        AUDIT[Audit logger<br/>implemented append-only JSONL]
+        DB[(Persistent user/role DB<br/>not implemented)]
+        LOG[(Audit log<br/>no hash-chain/HMAC verification yet)]
 
         API --> AUTH
         API --> RBAC
@@ -70,26 +70,26 @@ flowchart LR
 
 | Component | Code location | Responsibility | Status |
 |---|---|---|---|
-| FastAPI app and configuration | `app/main.py`, `app/config.py` | Application setup, settings, and secret loading | Scaffold / TBC |
+| FastAPI app and configuration | `app/main.py`, `app/config.py` | Application setup, settings, and secret loading | Implemented |
 | Crypto engine | `app/domains/crypto/aes_engine.py` | AES-256-GCM encryption and decryption | Implemented |
 | Integrity hasher | `app/domains/crypto/hasher.py` | SHA-256 hashing and constant-time digest comparison | Implemented |
 | Crypto contracts | `app/domains/crypto/protocols.py` | Interfaces for cipher and hash implementations | Implemented |
 | Vault models | `app/domains/vault/models.py` | Validated encrypted-file metadata envelope | Implemented |
 | Vault storage contract | `app/domains/vault/protocols.py` | Storage and safe-path interface | Implemented |
 | Vault storage adapter | `app/domains/vault/disk_storage.py` | Path confinement, ciphertext persistence, metadata persistence, and reads | Implemented |
-| Auth service | `app/domains/auth/` | Password hashing, login, JWT creation, and verification | Planned / TBC |
-| RBAC guards | Auth dependencies or route guards | Authorization checks on every protected request | Planned / TBC |
+| Auth service | `app/domains/auth/` | Password hashing, login, JWT creation, and verification | Implemented (seed-user prototype) |
+| RBAC guards | `app/dependencies.py` `RequireRoles` and protected routes | Authorization checks on protected requests | Implemented |
 | Input validation | Vault/API route dependencies | File size, type, filename, and request validation | Planned / TBC |
-| Audit logger | `app/telemetry/audit_logger.py` | Append-only security-event recording and verification | Planned / TBC |
-| Routers | `app/domains/*/router.py` | `/auth`, `/vault`, and `/audit` endpoints | Planned / TBC |
-| Composition root | `app/dependencies.py` | Dependency injection and implementation wiring | Planned / TBC |
+| Audit logger | `app/telemetry/audit_logger.py` | Append-only security-event recording with redaction | Implemented (no cryptographic tamper-proof verification) |
+| Routers | `app/domains/*/router.py`, `app/telemetry/router.py` | `/auth`, `/vault`, and `/audit` endpoints | Implemented |
+| Composition root | `app/dependencies.py` | Dependency injection and implementation wiring | Implemented |
 | Dependency and repository governance | `requirements.txt`, `.github/workflows/`, repository settings | Dependency review, CI gates, branch protection, and workflow ownership | Partial / TBC |
 
 ## 4. Implemented Security Foundations
 
 ### 4.1 AES-256-GCM
 
-`AesGcmCipherEngine` requires a 32-byte key. It generates a random 12-byte nonce for each encryption operation and returns the nonce prefixed to the ciphertext and authentication tag. During decryption, an invalid tag raises an error before plaintext is returned. Nonce-uniqueness evidence is tracked by TC-17 but is not yet recorded as a completed run in `TEST_MATRIX.md`.
+`AesGcmCipherEngine` requires a 32-byte key. It generates a random 12-byte nonce for each encryption operation and returns the nonce prefixed to the ciphertext and authentication tag. During decryption, an invalid tag raises an error before plaintext is returned. Nonce-uniqueness evidence is recorded in `TEST_MATRIX.md` for TC-17.
 
 ### 4.2 SHA-256 Integrity Verification
 
@@ -116,11 +116,11 @@ The current baseline documents and tests the following controls:
 - `python-dotenv` is an explicit dependency for `dotenv.load_dotenv`.
 - `setup.bat` creates `.env` only when absent, does not overwrite an existing file, checks required secrets, validates configuration, and initializes `vault_storage`.
 
-These controls harden configuration but do not constitute a complete authentication, RBAC, audit, or API implementation. Dependency pinning and dependency-audit automation remain open under F-05/F-12 and T5.
+These controls harden configuration and are integrated with implemented authentication, RBAC, vault, and telemetry routes. Prototype limitations remain: no persistent user database, no keyed/hash-chained metadata integrity model, and no cryptographic verification chain for audit logs. Dependency pinning and dependency-audit automation remain open under F-05/F-12 and T5.
 
 ## 5. Key Request Flows
 
-The following flows describe the target application design. Steps marked **planned/TBC** are not represented as complete implementation in the current repository.
+The following flows describe the currently implemented request paths and their remaining hardening gaps.
 
 ### 5.1 Upload
 
@@ -134,14 +134,14 @@ sequenceDiagram
     participant S as Vault storage
     participant L as Audit log
     U->>API: POST upload (JWT, file)
-    API->>A: Verify JWT and load role from DB (planned/TBC)
-    A-->>API: User and role, or 401/403 (planned/TBC)
+    API->>A: Verify JWT and enforce role guard
+    A-->>API: User and role, or 401/403
     API->>V: Check size, magic bytes, and filename (planned/TBC)
     V-->>API: Valid file, or 400/413 (planned/TBC)
     API->>C: Encrypt with AES-256-GCM and compute SHA-256
     C->>S: save_blob(): .bin + .meta.json
-    API->>L: Log user, role, time, IP, and action (planned/TBC)
-    API-->>U: 201 Created (planned/TBC)
+    API->>L: Log upload event to append-only JSONL logger
+    API-->>U: 201 Created
 ```
 
 ### 5.2 Download
@@ -155,46 +155,46 @@ sequenceDiagram
     participant C as Crypto engine
     participant L as Audit log
     U->>API: GET file_id (JWT)
-    API->>A: Verify JWT and check access (planned/TBC)
-    A-->>API: Allowed, or 403 (planned/TBC)
+    API->>A: Verify JWT and check access
+    A-->>API: Allowed, or 401/403
     API->>S: read_blob(file_id)
     S->>C: Ciphertext + metadata envelope
     C-->>API: Decrypt after GCM verification
-    API->>L: Log download (planned/TBC)
-    API-->>U: 200 file (planned/TBC)
+    API->>L: Log download/integrity-failure event
+    API-->>U: 200 file or 400/404 on integrity/missing-file errors
 ```
 
 ## 6. RBAC Permission Matrix
 
-This matrix is based on the role definitions in [`THREAT_MODEL.md`](THREAT_MODEL.md) §2. Deny by default. Complete route enforcement is planned/TBC and is tested by TC-12, TC-13, and TC-16 when the relevant modules exist.
+This matrix is based on the role definitions in [`THREAT_MODEL.md`](THREAT_MODEL.md) §2. Deny by default. Route-level enforcement exists in the current API, but Admin user-management routes and persistent role storage are not implemented.
 
 | Action | Administrator | Compliance Auditor | General Staff |
 |---|---|---|---|
 | Create users and assign roles | Planned ✓ | ✗ | ✗ |
-| Upload documents | Planned ✓ | ✗ | Planned ✓ for permitted categories |
-| Download any document | Planned ✓ | Planned ✓ read-only | ✗ |
-| Download documents permitted to own role | Planned ✓ | Planned ✓ | Planned ✓ |
+| Upload documents | Implemented ✓ | ✗ | Implemented ✓ |
+| Download any document | Implemented ✓ | Implemented ✓ read-only | Implemented ✓ (current prototype does not enforce per-document ownership categories) |
+| Download documents permitted to own role | Implemented ✓ | Implemented ✓ | Implemented ✓ |
 | Delete documents | TBC | ✗ | ✗ |
-| View audit log | TBC | Planned ✓ | ✗ |
+| View audit log | Implemented ✓ | Implemented ✓ | ✗ |
 | Delete or edit audit log entries | ✗ | ✗ | ✗ |
 | Change configuration | Planned ✓ | ✗ | ✗ |
 
-Target rules: users are pre-registered by an Administrator, users cannot change their own role, and the role is loaded from the database rather than trusted solely from a JWT claim.
+Current behavior: users are pre-seeded in memory, users cannot self-assign roles through API routes, and route guards enforce role claims from verified JWT payloads. Persistent database-backed role lookup is not implemented.
 
 ## 7. Security Controls Map
 
 | Control | Component | Threats | Findings | Tests | Current status |
 |---|---|---|---|---|---|
-| bcrypt hashing, lockout, and generic errors | Auth service | S1 | F-05 | TC-01 | Planned / TBC |
-| HS256 fixed in code, strong secret, and short expiry | Configuration/auth | S2, S3, E2 | F-01, F-02, F-07 | TC-02, TC-07, TC-13, TC-18 | Configuration implemented; full auth-flow and replay tests planned |
-| Role reloaded from DB and deny by default | RBAC guards | E1, E2, E4 | — | TC-12, TC-13, TC-16, TC-23 | Planned / TBC |
-| AES-256-GCM authenticated encryption | Crypto engine | T1, I5, I7 | F-04 | TC-03, TC-15, TC-17 | Implemented; TC-03 and TC-15 evidence is recorded, TC-17 run evidence remains to be recorded |
+| bcrypt hashing, lockout, and generic errors | Auth service | S1 | F-05 | TC-01 | Password hashing and generic error handling implemented; lockout/rate-limiting remains planned |
+| HS256 fixed in code, strong secret, and short expiry | Configuration/auth | S2, S3, E2 | F-01, F-02, F-07 | TC-02, TC-07, TC-13, TC-18 | Configuration/JWT controls implemented; replay revocation remains planned |
+| Role reloaded from DB and deny by default | RBAC guards | E1, E2, E4 | — | TC-12, TC-13, TC-16, TC-23 | Deny-by-default route guards implemented; persistent DB-backed role reload remains planned |
+| AES-256-GCM authenticated encryption | Crypto engine | T1, I5, I7 | F-04 | TC-03, TC-15, TC-17 | Implemented; unit evidence is recorded for TC-03, TC-15, and TC-17 |
 | HMAC-protected integrity hashes | Crypto engine | T2 | — | TC-04 | Planned |
 | Safe path resolution and confinement | Vault storage | I2 | F-08 | TC-08 | Verified with passing vault unit tests |
-| Separate ciphertext and metadata storage | Vault storage | I5 | F-09 | TC-15, TC-16 | Storage behavior verified; complete E2E integration remains planned |
+| Separate ciphertext and metadata storage | Vault storage | I5 | F-09 | TC-15, TC-16 | Storage behavior implemented and unit-tested; integration test exists with no recorded run evidence yet |
 | Parameterized queries / ORM | Database access | T4 | — | TC-14 | Planned / TBC |
 | Size limit, rate limiting, and magic-byte allowlist | Input validation | D1, D2 | — | TC-10, TC-11 | Planned / TBC |
-| Hash-chained append-only audit log | Audit logger | T3, R1, I8, D3 | — | TC-05, TC-06, TC-19, TC-20 | Planned / TBC |
+| Append-only audit log (JSONL) | Audit logger | T3, R1, I8, D3 | — | TC-05, TC-06, TC-19, TC-20 | Implemented append-only logging; cryptographic tamper resistance and verification chain remain planned |
 | Keys only in git-ignored `.env`, checked at startup | Configuration | I1, I6, D4 | F-02, F-03, F-04, F-10, F-11 | TC-07, TC-21 | Implemented configuration/setup guardrails; operational key backup and recovery remain planned |
 | Dependency review and secure package provenance | Requirements/CI | T5 | F-05, F-12 | TC-22 | Planned / TBC |
 | Branch protection and workflow ownership | Repository governance | T6 | — | TC-23 | Not verified; repository settings require inspection |
@@ -215,15 +215,14 @@ Target rules: users are pre-registered by an Administrator, users cannot change 
 
 Before the final report is exported, confirm:
 
-1. Exact auth and RBAC module paths and route implementations.
-2. Whether SQLite metadata integration exists and which models/repositories are authoritative.
-3. The audit logger format, persistence location, hash-chain design, and verification command.
-4. File-size limits, magic-byte rules, rate limiting, and API error-handling behavior.
-5. Whether the composition root is complete and all interfaces are wired into FastAPI dependencies.
-6. The final delete-document and audit-log permissions.
-7. Repository settings for branch protection, CODEOWNERS, action pinning, and MFA governance.
-8. Dependency pinning, package replacement, and `pip-audit` integration before the auth PR merges.
-9. That architecture claims remain aligned with `THREAT_MODEL.md` v0.6 and evidence in `TEST_MATRIX.md` v0.2.
+1. Replace in-memory seed users with persistent user/role storage and secure lifecycle controls.
+2. Add file-size limits, magic-byte allowlisting, and rate limiting to upload/auth endpoints.
+3. Add cryptographic audit-log tamper verification (hash chain and/or HMAC), plus a verification routine.
+4. Add keyed metadata integrity (HMAC or equivalent) and anti-rollback/versioning controls.
+5. Define and implement final delete-document and audit-log retention/permissions policy.
+6. Confirm repository settings for branch protection, CODEOWNERS, action pinning, and MFA governance.
+7. Complete dependency pinning, package replacement, and `pip-audit` integration.
+8. Keep architecture claims aligned with `THREAT_MODEL.md` v1.0 and evidence in `TEST_MATRIX.md` v0.3.
 
 ## 10. Change Log
 
@@ -232,3 +231,4 @@ Before the final report is exported, confirm:
 | v0.1 | 2026-10-18 | D. Williams (draft for O. Kwon) | Corrected the architecture draft using current repository paths; separated implemented crypto/storage foundations from planned auth, RBAC, validation, audit, and API components. |
 | v0.1 | 2026-10-19 | D. Williams | Synchronized linked-document versions and baseline with threat model v0.5 and documentation guide v0.5; documented configuration-hardening details. |
 | v0.1 | 2026-10-19 | D. Williams | Synchronized with threat model v0.6 and test matrix v0.2; added repository/CI boundary coverage, expanded control mappings, and documented remaining dependency, integration, and governance gaps. |
+| v0.1 | 2026-10-23 | Copilot | Synchronized architecture claims with current implementation (`main@ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`): marked auth/RBAC/audit/routers/composition wiring implemented, retained prototype limitations (seed users, no persistent user DB, append-only non-hash-chained audit log, plain SHA-256 metadata integrity), and aligned links/open items with threat model v1.0 and test matrix v0.3. |
