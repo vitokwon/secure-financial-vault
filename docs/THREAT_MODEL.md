@@ -8,7 +8,7 @@
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
 | Current version | **v1.0 — Release Candidate** |
 | Last updated | 2026-10-21 |
-| Code baseline reviewed | `main` at commit `9cb8b91db2b05257199fb24024de45d0e4225b3b`; crypto engine, hasher, vault storage, configuration hardening, tests, setup, and CI workflows reviewed |
+| Code baseline reviewed | `main` at commit `ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`; crypto engine, auth/RBAC routes, vault storage, telemetry logger, configuration hardening, tests, setup, and CI workflows reviewed |
 | Methodology | STRIDE per element (§6.1), Likelihood × Impact risk rating before and after mitigation (§5, §6.2) |
 
 ---
@@ -101,34 +101,34 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | ID | STRIDE | Threat | Boundary / Asset | L | I | Risk | Mitigation | Status | Test ID | Demo |
 |---|---|---|---|---|---|---|---|---|---|---|
 | S1 | Spoofing | Password guessing or credential stuffing on login | TB1 / A4 | 3 | 3 | **High (9)** | bcrypt hashing; login rate limiting / lockout; generic error messages | Planned | TC-01 | Show lockout |
-| S2 | Spoofing | Forged JWT (weak secret, `alg: none`, algorithm confusion) | TB1 / A3 | 2 | 3 | **High (6)** | Only `HS256` allowed, JWT secret ≥ 32 bytes and token lifetime 1–15 minutes, enforced in `app/config.py`; JWT issuance and verification with a maintained library in the auth service | Planned | TC-02 | Optional |
+| S2 | Spoofing | Forged JWT (weak secret, `alg: none`, algorithm confusion) | TB1 / A3 | 2 | 3 | **High (6)** | Only `HS256` allowed, JWT secret ≥ 32 bytes and token lifetime 1–15 minutes, enforced in `app/config.py`; JWT issuance and verification with a maintained library in the auth service | Implemented | TC-02 | Optional |
 | S3 | Spoofing | Stolen JWT replayed (copied from browser storage, logs or Swagger UI) | TB1 / A3 | 2 | 3 | **High (6)** | Short token lifetime (≤ 15 min, enforced in config); tokens never written to logs; HTTPS in deployment; server-side revocation on logout (`jti` denylist) if time allows | Planned | TC-18 | Optional |
-| T1 | Tampering | Ciphertext altered on disk | TB3 / A1 | 2 | 3 | **High (6)** | AES-GCM authentication tag rejects modified ciphertext before decryption | Implemented | TC-03 | Show tamper detection |
+| T1 | Tampering | Ciphertext altered on disk | TB3 / A1 | 2 | 3 | **High (6)** | AES-GCM authentication tag rejects modified ciphertext before decryption | Verified | TC-03 | Show tamper detection |
 | T2 | Tampering | File and stored hash both replaced, or older valid version restored (rollback) | TB3 / A5 | 1 | 3 | **Medium (3)** | `Sha256Hasher` currently uses plain SHA-256 with constant-time comparison only; HMAC-protected stored hashes under a separate key plus version records planned. Rollback remains residual | Planned | TC-04 | Optional |
 | T3 | Tampering | Audit log entries edited or deleted | TB4 / A6 | 2 | 3 | **High (6)** | Hash-chained, HMAC-signed entries; log verification routine | Planned | TC-05 | Optional |
 | T4 | Tampering / Info disclosure | SQL injection through login, search or metadata fields | TB1, TB3 / A4, A5 | 2 | 3 | **High (6)** | Parameterized queries / ORM only; server-side input validation | Planned | TC-14 | Optional |
 | T5 | Tampering / Elevation | Vulnerable or malicious third-party package (unpinned versions, typosquatting, known CVEs) runs inside the application | TB5 / A7, A1–A3 | 2 | 3 | **High (6)** | Pin exact versions in `requirements.txt`; replace `python-jose` and `passlib` (F-05); `pip-audit` in CI alongside Bandit; review every dependency change in a PR | Planned | TC-22 | No |
 | T6 | Tampering | CI workflow or `main` branch changed to skip security checks or merge unreviewed code (edited workflow, compromised contributor account) | TB5 / A7 | 1 | 3 | **Medium (3)** | Branch protection on `main` requiring a reviewed PR and passing checks; CODEOWNERS covering `.github/workflows/`; third-party actions pinned to a version or commit SHA; no secrets in workflow files; MFA on team GitHub accounts | Open | TC-23 | No |
-| R1 | Repudiation | User denies uploading, downloading or deleting a file | TB4 / A6 | 2 | 2 | **Medium (4)** | Log user ID, role, timestamp, IP and action (accountability, not legal non-repudiation) | Planned | TC-06 | Show audit log |
+| R1 | Repudiation | User denies uploading, downloading or deleting a file | TB4 / A6 | 2 | 2 | **Medium (4)** | Log user ID, role, timestamp, IP and action (accountability, not legal non-repudiation) | Implemented | TC-06 | Show audit log |
 | I1 | Info disclosure | Encryption or JWT key exposed through the repository (committed `.env`, key in code) | TB2 / A2, A3 | 2 | 3 | **High (6)** | `.env` ignored in `.gitignore`; `ENCRYPTION_KEY` (legacy `FERNET_SECRET_KEY` fallback) must be URL-safe Base64 decoding to exactly 32 bytes; `JWT_SECRET_KEY` ≥ 32 bytes; `.env` loading dependency declared. Operational secret management (vault/HSM, rotation governance) is outside prototype scope | Implemented | TC-07 | Describe only |
 | I2 | Info disclosure | Path traversal via filename (`../../`) | TB1 / A1 | 2 | 3 | **High (6)** | `DiskVaultStorage.resolve_safe_path()` rejects null bytes, strips directory components via `Path(...).name`, resolves against the vault base path, and enforces confinement with `is_relative_to()` in `app/domains/vault/disk_storage.py` | Implemented | TC-08 | Show rejection |
 | I3 | Info disclosure | Data or tokens intercepted in transit | TB1 / A1, A3 | 2 | 3 | **High (6)** | HTTPS/TLS (documented as deployment requirement for demo) | Planned | — | No |
 | I4 | Info disclosure | Error messages or API docs reveal internals | TB1 | 2 | 1 | **Low (2)** | Generic errors; debug off; disable `/docs` in production | Open | TC-09 | No |
-| I5 | Info disclosure | Stolen disk or backup exposes stored documents | TB3 / A1 | 2 | 3 | **High (6)** | Encryption foundation uses AES-GCM; ciphertext and metadata are stored separately (`{file_id}.bin` + `{file_id}.meta.json`) through `save_blob()` / `read_blob()` in `app/domains/vault/disk_storage.py`, with envelope schema in `app/domains/vault/models.py`. Complete upload/download integration remains TBC | Implemented | TC-15, TC-16 | Show ciphertext on disk |
+| I5 | Info disclosure | Stolen disk or backup exposes stored documents | TB3 / A1 | 2 | 3 | **High (6)** | Encryption foundation uses AES-GCM; ciphertext and metadata are stored separately (`{file_id}.bin` + `{file_id}.meta.json`) through `save_blob()` / `read_blob()` in `app/domains/vault/disk_storage.py`, with envelope schema in `app/domains/vault/models.py`. Integration tests exist but are not yet recorded in the run log | Implemented | TC-15, TC-16 | Show ciphertext on disk |
 | I6 | Info disclosure | Server compromise reads the single master key, exposing every file | TB2 / A2 | 1 | 3 | **Medium (3) — residual** | Key in environment, never in repo or DB; rotation plan; production would use a key vault / HSM | Planned | TC-07 | Describe only |
-| I7 | Info disclosure / Tampering | AES-GCM nonce reused under the same key (fixed, counter-reset or predictable nonce), breaking confidentiality and authenticity | TB2, TB3 / A1, A2 | 2 | 3 | **High (6)** | Fresh random 96-bit nonce from a CSPRNG (`os.urandom(12)` / `secrets`) for every encryption, stored with the ciphertext; never derived from file ID or time; unit test that repeated encryptions of the same file produce different nonces; documented key-usage limit | Open | TC-17 | No |
-| I8 | Info disclosure | Audit log exposes sensitive data (passwords on failed login, tokens, document contents) | TB4 / A6 | 2 | 2 | **Medium (4)** | Log event metadata only: never passwords, tokens or file contents; audit log readable by Auditor and Admin only (RBAC) | Planned | TC-19 | No |
+| I7 | Info disclosure / Tampering | AES-GCM nonce reused under the same key (fixed, counter-reset or predictable nonce), breaking confidentiality and authenticity | TB2, TB3 / A1, A2 | 2 | 3 | **High (6)** | Fresh random 96-bit nonce from a CSPRNG (`os.urandom(12)` / `secrets`) for every encryption, stored with the ciphertext; never derived from file ID or time; unit test that repeated encryptions of the same file produce different nonces; documented key-usage limit | Verified | TC-17 | No |
+| I8 | Info disclosure | Audit log exposes sensitive data (passwords on failed login, tokens, document contents) | TB4 / A6 | 2 | 2 | **Medium (4)** | Log event metadata only: never passwords, tokens or file contents; audit log readable by Auditor and Admin only (RBAC) | Verified | TC-19 | No |
 | D1 | Denial of service | Oversized or repeated uploads exhaust disk/CPU | TB1 | 2 | 2 | **Medium (4)** | File-size limit; request rate limiting | Planned | TC-10 | Optional |
 | D2 | DoS / Tampering | Malicious file disguised by extension (e.g., `.exe` renamed `.pdf`) | TB1 / A1 | 2 | 2 | **Medium (4)** | Magic-byte allowlist; files never executed | Planned | TC-11 | Show rejection |
 | D3 | Denial of service | Audit log flooded by repeated failed requests until disk fills or real events are buried | TB4 / A6 | 2 | 2 | **Medium (4)** | Rate limiting shared with D1 and S1; log size monitoring; rotation that preserves the hash chain across files | Planned | TC-20 | No |
 | D4 | Denial of service | Encryption key lost, overwritten or corrupted, making every stored file permanently unrecoverable | TB2 / A2, A1 | 2 | 3 | **High (6)** | Setup does not overwrite an existing `.env`, but key backup, recovery procedure, and startup canary validation are not implemented | Planned | TC-21 | Describe only |
-| E1 | Elevation | User requests another role's file by ID (IDOR) | TB1 / A1 | 3 | 3 | **High (9)** | Server-side RBAC check on every request; deny by default | Planned | TC-12, TC-16 | Show 403 |
+| E1 | Elevation | User requests another role's file by ID (IDOR) | TB1 / A1 | 3 | 3 | **High (9)** | Server-side RBAC check on every request; deny by default | Implemented | TC-12, TC-16 | Show 403 |
 | E2 | Elevation | User edits role claim in JWT | TB1 / A3 | 2 | 3 | **High (6)** | Signature verification; reload role from database per request | Planned | TC-13 | Optional |
 | E3 | Elevation | Insider admin misuses legitimate access | Whole system | 1 | 3 | **Medium (3) — residual** | Least privilege; separate key and storage duties; audit review | Planned | — | No |
 | E4 | Elevation / Tampering | User-role records edited directly in the SQLite file to self-promote | TB3 / A5 | 1 | 3 | **Medium (3)** | SQLite file readable and writable only by the application service account; roles changed only through the Admin API; every role change written to the audit log | Open | — | No |
 
-**Summary (v0.6):** 26 threats across all six STRIDE categories; 14 High, 10 Medium, 1 Low before mitigation.
-**Status (v0.6):** 4 Implemented (T1, I1, I2, I5) · 0 Verified · 18 Planned · 4 Open (T6, I4, I7, E4).
+**Summary (v1.0):** 26 threats across all six STRIDE categories; 14 High, 10 Medium, 1 Low before mitigation.
+**Status (v1.0 synchronized to `main@ac6584d...`):** 6 Implemented (S2, R1, I1, I2, I5, E1) · 3 Verified (T1, I7, I8) · 14 Planned · 3 Open (T6, I4, E4).
 
 ### 6.1 STRIDE-per-Element Coverage
 
@@ -158,7 +158,7 @@ Residual risk assumes the listed mitigation is implemented. Owners follow the wo
 | S1 | O. Kwon | D. Sorathiya | Phase 3 (10/19) | — | 1 × 3 | Medium (3) |
 | S2 | O. Kwon | D. Sorathiya | Phase 3 (10/19) | Config controls implemented in `app/config.py` (F-01, F-02, F-07); `tests/unit/test_config.py`. Full JWT flow pending | 1 × 3 | Medium (3) |
 | S3 | O. Kwon | D. Sorathiya | Phase 3 (10/19) | Token lifetime cap implemented (F-07) | 1 × 3 | Medium (3) |
-| T1 | O. Kwon | D. Sorathiya | Phase 2 — record run | `tests/unit/test_crypto.py::test_tamper_detection` | 2 × 2 | Medium (4) — modification detected; one document unavailable |
+| T1 | O. Kwon | D. Sorathiya | Phase 2 — unit evidence recorded | `tests/unit/test_crypto.py::test_tamper_detection` (recorded in `TEST_MATRIX.md` run log, 2026-10-20) | 2 × 2 | Medium (4) — modification detected; one document unavailable |
 | T2 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 3 | Medium (3) — rollback remains (§8) |
 | T3 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 2 × 2 | Medium (4) — edits detected, not prevented |
 | T4 | O. Kwon | D. Sorathiya | Phase 3–4 | — | 1 × 3 | Medium (3) |
@@ -169,10 +169,10 @@ Residual risk assumes the listed mitigation is implemented. Owners follow the wo
 | I2 | O. Kwon | D. Sorathiya | Done — record run | `tests/unit/test_vault.py::test_directory_traversal_mitigation`, `::test_null_byte_injection_blocked` (F-08) | 1 × 3 | Medium (3) |
 | I3 | D. Williams (document) | — | Report | Deployment requirement (§9) | 2 × 3 local demo / 1 × 3 with TLS | High (6) for local demo, accepted; Medium (3) when deployed |
 | I4 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | `/docs` accepted for demo (F-06) | 1 × 1 | Low (1) |
-| I5 | O. Kwon | D. Sorathiya | Done — record run; E2E in Phase 4 | `tests/unit/test_vault.py::test_envelope_and_blob_storage_roundtrip`, `::test_nonexistent_blob_read_raises` (F-09) | 1 × 3 | Medium (3) — complete integration remains TBC |
+| I5 | O. Kwon | D. Sorathiya | Done — record run; E2E evidence pending | `tests/unit/test_vault.py::test_envelope_and_blob_storage_roundtrip`, `::test_nonexistent_blob_read_raises` (F-09) | 1 × 3 | Medium (3) — integration run evidence not yet recorded |
 | I6 | O. Kwon | — | Report | Key in environment only | 1 × 3 | Medium (3) — highest residual (§8) |
-| I7 | O. Kwon | D. Sorathiya | Before Phase 4 — confirm nonce generation in `aes_engine.py` | — | 1 × 3 | Medium (3) |
-| I8 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
+| I7 | O. Kwon | D. Sorathiya | Before Phase 4 — confirm nonce generation in `aes_engine.py` | `tests/unit/test_crypto.py::test_random_nonce_produces_unique_ciphertexts` (recorded in `TEST_MATRIX.md` run log, 2026-10-20) | 1 × 3 | Medium (3) |
+| I8 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | `tests/unit/test_telemetry.py::test_sensitive_credential_redaction` (recorded in `TEST_MATRIX.md` run log, 2026-10-20) | 1 × 2 | Low (2) |
 | D1 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
 | D2 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
 | D3 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
@@ -184,7 +184,7 @@ Residual risk assumes the listed mitigation is implemented. Owners follow the wo
 
 Any High threat whose mitigation is not implemented and tested by the final dry run (10/23) is moved to §8 with a written justification before the `v1.0` export.
 
-## 7. Code Review Findings (Baseline: `main@9cb8b91db2b05257199fb24024de45d0e4225b3b`)
+## 7. Code Review Findings (Baseline: `main@ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`)
 
 | ID | File | Finding | Related threat | Severity | Status |
 |---|---|---|---|---|---|
@@ -223,7 +223,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 - Threats use STRIDE-letter IDs (S1, T1, R1, I1, D1, E1); findings use F-01…; tests use TC-01…; threat actors use TA1….
 - The same IDs are used in the report, slides, test matrix and demo script.
 - The earlier role workbook (Sep 30) used T1–T12 / TC1–TC12; those IDs are **superseded** by this register.
-- Tests added in v0.6: TC-16 (end-to-end login → upload → role-based download), TC-17 (nonce uniqueness), TC-18 (token replay / revocation), TC-19 (audit log content), TC-20 (audit log flooding), TC-21 (key loss: wrong or missing key detected at startup and setup never overwrites `.env`), TC-22 (dependency audit: versions pinned and `pip-audit` clean), TC-23 (repository inspection: branch protection and CODEOWNERS for workflows). These proposed tests must be added to `TEST_MATRIX.md` before they count as formal coverage.
+- Tests added in v0.6: TC-16 (end-to-end login → upload → role-based download), TC-17 (nonce uniqueness), TC-18 (token replay / revocation), TC-19 (audit log content), TC-20 (audit log flooding), TC-21 (key loss: wrong or missing key detected at startup and setup never overwrites `.env`), TC-22 (dependency audit: versions pinned and `pip-audit` clean), TC-23 (repository inspection: branch protection and CODEOWNERS for workflows). These tests are now registered in `TEST_MATRIX.md`; only rows with recorded run evidence count as verified coverage.
 
 ## 11. Change Log
 
@@ -239,6 +239,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v0.8 | 2026-10-20 | D. Williams | Added Semgrep CI policy: blocking scans for `app/` and `.github/workflows/`, advisory scan for `tests/`, and narrowly scoped `nosemgrep` suppression guidance mapped to TC-22/T5/T6 without changing threat verification status. |
 | v0.9 | 2026-10-20 | O. Kwon | Phase 4 Security Telemetry: Implemented append-only FileAuditLogger, immutable AuditEvent models, and automatic credential redaction (mapped to STRIDE R1 non-repudiation and audit inspection controls) |
 | v1.0 | 2026-10-21 | O. Kwon | Phase 5 Integration: Wired composition root dependencies, verified 3-tier RBAC Swagger endpoints, added automated E2E integration test suite, and documented verification guide |
+| v1.0 | 2026-10-23 | Copilot | Documentation synchronization only: updated baseline references to `main@ac6584d...`, reconciled status values with implemented auth/RBAC/audit integration and recorded unit-test evidence in `TEST_MATRIX.md`, and kept append-only audit logging distinct from not-yet-implemented cryptographic hash-chain/HMAC tamper resistance. |
 
 ## 12. Review Triggers
 
