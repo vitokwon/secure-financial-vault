@@ -7,8 +7,8 @@
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
 | Current version | **v1.0 — Release Candidate** |
-| Last updated | 2026-10-21 |
-| Code baseline reviewed | `main` at commit `ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`; crypto engine, auth/RBAC routes, vault storage, telemetry logger, configuration hardening, tests, setup, and CI workflows reviewed |
+| Last updated | 2026-10-23 |
+| Code baseline reviewed | `main` at commit `96e6e76426ae3db4968bdaaa61389b7f47f4e0dc`; includes merged PR #22 updates for Staff download ownership enforcement, AES key decoding usage, and demo telemetry HTML-escaping |
 | Methodology | STRIDE per element (§6.1), Likelihood × Impact risk rating before and after mitigation (§5, §6.2) |
 
 ---
@@ -122,13 +122,13 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | D2 | DoS / Tampering | Malicious file disguised by extension (e.g., `.exe` renamed `.pdf`) | TB1 / A1 | 2 | 2 | **Medium (4)** | Magic-byte allowlist; files never executed | Planned | TC-11 | Show rejection |
 | D3 | Denial of service | Audit log flooded by repeated failed requests until disk fills or real events are buried | TB4 / A6 | 2 | 2 | **Medium (4)** | Rate limiting shared with D1 and S1; log size monitoring; rotation that preserves the hash chain across files | Planned | TC-20 | No |
 | D4 | Denial of service | Encryption key lost, overwritten or corrupted, making every stored file permanently unrecoverable | TB2 / A2, A1 | 2 | 3 | **High (6)** | Setup does not overwrite an existing `.env`, but key backup, recovery procedure, and startup canary validation are not implemented | Planned | TC-21 | Describe only |
-| E1 | Elevation | User requests another role's file by ID (IDOR) | TB1 / A1 | 3 | 3 | **High (9)** | Server-side RBAC check on every request; deny by default | Implemented | TC-12, TC-16 | Show 403 |
+| E1 | Elevation | User requests another user's file by ID (IDOR/BOLA) | TB1 / A1 | 3 | 3 | **High (9)** | Server-side RBAC check on every request; Staff downloads enforce `envelope.owner_id == current_user.sub`; unauthorized cross-owner requests return `403` and emit `ACCESS_DENIED` with `status: "BLOCKED"` | Implemented | TC-12, TC-16, TC-24 | Show Staff cross-owner denial |
 | E2 | Elevation | User edits role claim in JWT | TB1 / A3 | 2 | 3 | **High (6)** | Signature verification; reload role from database per request | Planned | TC-13 | Optional |
 | E3 | Elevation | Insider admin misuses legitimate access | Whole system | 1 | 3 | **Medium (3) — residual** | Least privilege; separate key and storage duties; audit review | Planned | — | No |
 | E4 | Elevation / Tampering | User-role records edited directly in the SQLite file to self-promote | TB3 / A5 | 1 | 3 | **Medium (3)** | SQLite file readable and writable only by the application service account; roles changed only through the Admin API; every role change written to the audit log | Open | — | No |
 
 **Summary (v1.0):** 26 threats across all six STRIDE categories; 14 High, 10 Medium, 1 Low before mitigation.
-**Status (v1.0 synchronized to `main@ac6584d...`):** 6 Implemented (S2, R1, I1, I2, I5, E1) · 3 Verified (T1, I7, I8) · 14 Planned · 3 Open (T6, I4, E4).
+**Status (v1.0 synchronized to `main@96e6e764...`):** 6 Implemented (S2, R1, I1, I2, I5, E1) · 3 Verified (T1, I7, I8) · 14 Planned · 3 Open (T6, I4, E4). E1 implementation now includes Staff object-level ownership enforcement; TC-24 execution evidence is still required before any `Verified` status change.
 
 ### 6.1 STRIDE-per-Element Coverage
 
@@ -177,14 +177,14 @@ Residual risk assumes the listed mitigation is implemented. Owners follow the wo
 | D2 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
 | D3 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
 | D4 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | `setup.bat` does not overwrite an existing `.env`; key backup and startup canary check pending | 1 × 3 | Medium (3) |
-| E1 | O. Kwon | D. Sorathiya | Phase 3 (10/19) | — | 1 × 3 | Medium (3) |
+| E1 | O. Kwon | D. Sorathiya | Phase 3 (10/19) | `app/domains/vault/router.py` enforces Staff owner checks and logs denied cross-owner access as `ACCESS_DENIED` with `status: "BLOCKED"`; TC-24 execution evidence pending in `TEST_MATRIX.md` | 1 × 3 | Medium (3) |
 | E2 | O. Kwon | D. Sorathiya | Phase 3 (10/19) | — | 1 × 3 | Medium (3) |
 | E3 | Team | — | Report | Logging and least privilege | 1 × 3 | Medium (3) — residual (§8) |
 | E4 | O. Kwon | — | Phase 4 (10/21) | — | 1 × 3 | Medium (3) — host trusted (§9) |
 
 Any High threat whose mitigation is not implemented and tested by the final dry run (10/23) is moved to §8 with a written justification before the `v1.0` export.
 
-## 7. Code Review Findings (Baseline: `main@ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`)
+## 7. Code Review Findings (Baseline: `main@96e6e76426ae3db4968bdaaa61389b7f47f4e0dc`)
 
 | ID | File | Finding | Related threat | Severity | Status |
 |---|---|---|---|---|---|
@@ -200,6 +200,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | F-10 | `requirements.txt`, `config.py` | `python-dotenv` dependency is explicitly declared, matching configuration and setup expectations | I1 | Medium | Implemented |
 | F-11 | `setup.bat` | `.env` is created from `.env.example` only when absent and is never overwritten; keys are not auto-generated; setup stops if secrets are empty and runs configuration validation | D4, I1 | Medium | Implemented |
 | F-12 | `setup.bat`, `requirements.txt` | Installs dependency ranges without pins or hashes and upgrades pip to the latest release, so each setup can pull different package versions | T5 | Medium | Open |
+| F-13 | `app/templates/demo.html` | Dynamic telemetry values are HTML-escaped before rendering, mitigating stored XSS in the demo viewer | I4 | Low | Implemented |
 
 ## 8. Residual Risks
 
@@ -223,7 +224,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 - Threats use STRIDE-letter IDs (S1, T1, R1, I1, D1, E1); findings use F-01…; tests use TC-01…; threat actors use TA1….
 - The same IDs are used in the report, slides, test matrix and demo script.
 - The earlier role workbook (Sep 30) used T1–T12 / TC1–TC12; those IDs are **superseded** by this register.
-- Tests added in v0.6: TC-16 (end-to-end login → upload → role-based download), TC-17 (nonce uniqueness), TC-18 (token replay / revocation), TC-19 (audit log content), TC-20 (audit log flooding), TC-21 (key loss: wrong or missing key detected at startup and setup never overwrites `.env`), TC-22 (dependency audit: versions pinned and `pip-audit` clean), TC-23 (repository inspection: branch protection and CODEOWNERS for workflows). These tests are now registered in `TEST_MATRIX.md`; only rows with recorded run evidence count as verified coverage.
+- Tests added in v0.6: TC-16 (end-to-end login → upload → role-based download), TC-17 (nonce uniqueness), TC-18 (token replay / revocation), TC-19 (audit log content), TC-20 (audit log flooding), TC-21 (key loss: wrong or missing key detected at startup and setup never overwrites `.env`), TC-22 (dependency audit: versions pinned and `pip-audit` clean), TC-23 (repository inspection: branch protection and CODEOWNERS for workflows), and TC-24 (Staff cross-owner document-download denial with `ACCESS_DENIED`/`BLOCKED` audit evidence). These tests are now registered in `TEST_MATRIX.md`; only rows with recorded run evidence count as verified coverage.
 
 ## 11. Change Log
 
@@ -240,6 +241,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v0.9 | 2026-10-20 | O. Kwon | Phase 4 Security Telemetry: Implemented append-only FileAuditLogger, immutable AuditEvent models, and automatic credential redaction (mapped to STRIDE R1 non-repudiation and audit inspection controls) |
 | v1.0 | 2026-10-21 | O. Kwon | Phase 5 Integration: Wired composition root dependencies, verified 3-tier RBAC Swagger endpoints, added automated E2E integration test suite, and documented verification guide |
 | v1.0 | 2026-10-23 | Copilot | Documentation synchronization only: updated baseline references to `main@ac6584d...`, reconciled status values with implemented auth/RBAC/audit integration and recorded unit-test evidence in `TEST_MATRIX.md`, and kept append-only audit logging distinct from not-yet-implemented cryptographic hash-chain/HMAC tamper resistance. |
+| v1.0 | 2026-10-23 | Copilot | Synchronized with merged PR #22 at `main@96e6e764...`: expanded E1 with Staff owner checks plus denied-access telemetry (`ACCESS_DENIED`/`BLOCKED`), mapped E1 coverage to TC-24 without verification claim, and added stored-XSS remediation finding F-13 as Implemented. |
 
 ## 12. Review Triggers
 

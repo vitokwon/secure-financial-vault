@@ -8,11 +8,11 @@ This guide defines where project documents live, how they are versioned, and how
 
 | Document | File | Owner | Reviewer | Version | Status | Last updated |
 |---|---|---|---|---|---|---|
-| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v1.0 | Release Candidate | 2026-10-21 |
+| Threat model (STRIDE) | `docs/THREAT_MODEL.md` | David Williams | OhUk Kwon | v1.0 | Release Candidate | 2026-10-23 |
 | Documentation guide | `docs/DOCUMENTATION_GUIDE.md` | David Williams | Dhruvi Sorathiya | v0.9 | Draft | 2026-10-23 |
-| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.3 | Draft | 2026-10-23 |
+| Test matrix | `docs/TEST_MATRIX.md` | Dhruvi Sorathiya | David Williams | v0.4 | Draft | 2026-10-23 |
 | Architecture notes and diagram | `docs/ARCHITECTURE.md` (exists) + `docs/diagrams/` (not present) | OhUk Kwon | David Williams | v0.1 | Draft | 2026-10-23 |
-| Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-16 |
+| Work breakdown structure | `docs/wbs.md` | OhUk Kwon | David Williams | — | Working document | 2026-10-23 |
 | Final technical report | `docs/report/` (planned path; not present) | David Williams | All | — | Not started | — |
 | Presentation slides | `docs/presentation/` (`.pptx` / `.pdf`, planned path; not present) | David Williams | All | — | Not started | — |
 | Setup guide | `README.md`, `setup_guideline.md` | OhUk Kwon | Dhruvi Sorathiya | — | Exists, unversioned | — |
@@ -74,7 +74,7 @@ Suggested tags:
 - Reconcile threat counts, risk totals, baseline commit references, implementation statuses, and setup/configuration claims before each report export.
 - Do not mark a control `Verified` based on source inspection alone; record the test result, executor, date, and commit in `docs/TEST_MATRIX.md`.
 - If the threat model advances before the test matrix or other documentation updates are complete, record the new threat-model version in this guide and leave non-owned documents pending until their owners update them.
-- Current baseline for synchronized security documentation set: `main@ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`.
+- Current baseline for synchronized security documentation set: `main@96e6e76426ae3db4968bdaaa61389b7f47f4e0dc`.
 
 ## 6. Documentation and Security Rules
 
@@ -101,3 +101,4 @@ Suggested tags:
 | v0.7 | 2026-10-20 | D. Williams | Synchronized the register with threat model v0.8 after resolving the PR merge conflict while preserving both prior v0.7 entries. |
 | v0.8 | 2026-10-20 | D. Williams | Documentation-guide-only synchronization: confirmed threat model remains at v0.8 and deferred test-matrix and other document updates to their owners. |
 | v0.9 | 2026-10-23 | Copilot | Synchronized register entries and cross-document baseline/version references with current repository state (`THREAT_MODEL.md` v1.0, `TEST_MATRIX.md` v0.3, `main@ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`), and marked missing planned paths as not present. |
+| v0.9 | 2026-10-23 | Copilot | Synchronized the documentation register and shared baseline to merged PR #22 (`main@96e6e76426ae3db4968bdaaa61389b7f47f4e0dc`), including `TEST_MATRIX.md` v0.4 and updated last-updated dates for threat model and WBS. |

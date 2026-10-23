@@ -4,10 +4,10 @@
 |---|---|
 | Document owner | Dhruvi Sorathiya (Security QA & Demonstration Lead) |
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
-| Current version | **v0.3 — Draft** |
+| Current version | **v0.4 — Draft** |
 | Last updated | 2026-10-23 |
 | Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v1.0 · [`ARCHITECTURE.md`](ARCHITECTURE.md) v0.1 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.9 |
-| Code baseline | `main` at `ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5` |
+| Code baseline | `main` at `96e6e76426ae3db4968bdaaa61389b7f47f4e0dc` |
 
 ---
 
@@ -19,7 +19,7 @@ The current repository includes executable unit tests for auth/JWT, crypto, vaul
 
 ## 2. Conventions
 
-- **Test IDs** follow the threat model: `TC-01` through `TC-23`.
+- **Test IDs** follow the threat model: `TC-01` through `TC-24`.
 - **Threat IDs** use the STRIDE identifiers from the threat register (`S1`, `T1`, `I2`, and so on).
 - **Type:** `Unit` · `Integration` · `Security` · `E2E` · `Inspection`.
 - **Status:** `Not run` · `Pass` · `Fail` · `Blocked` · `Planned`.
@@ -56,6 +56,7 @@ The current repository includes executable unit tests for auth/JWT, crypto, vaul
 | TC-21 | D4 | 4 | Missing, replaced, or corrupted encryption key; setup behavior with an existing `.env` | Security + Inspection | TBC — configuration/setup tests | Setup does not overwrite `.env`; invalid key prevents unsafe startup; recovery procedure is documented | | Planned | |
 | TC-22 | T5 | 3–4 | Dependency versions, known vulnerabilities, package integrity, and dependency-review process | Inspection + Security | TBC — `pip-audit`/dependency workflow | Security-sensitive dependencies are reviewed and pinned or constrained safely; known high-risk issues are addressed | | Planned | |
 | TC-23 | T6 | 4 | Branch protection, required reviews/checks, CODEOWNERS for workflows, action pinning, and MFA governance | Inspection | Repository settings and `.github/` configuration | Required repository controls are enabled and documented; workflow changes require review | | Not run | |
+| TC-24 | E1 | 4 | Staff attempts to download a document owned by another Staff user | E2E / Security | `tests/integration/test_api_flow.py` (planned update) | Request returns `403 Forbidden`; document is not returned; `ACCESS_DENIED` is logged with `status: "BLOCKED"` | Not run | Planned | |
 
 > TC-16 through TC-23 were introduced with threat-model v0.6. Integration and inspection cases remain `Not run` or `Planned` until execution evidence is recorded in §6.
 
@@ -107,7 +108,7 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 | D2 | Disguised file type | Medium (4) | TC-11 | Blocked | Magic-byte validation is TBC. |
 | D3 | Audit-log flooding | Medium (4) | TC-20 | Blocked | Audit logger, rotation, and rate limiting are TBC. |
 | D4 | Encryption-key loss | High (6) | TC-21 | Planned | Setup does not overwrite `.env`; backup, recovery, and canary checks are TBC. |
-| E1 | IDOR / cross-role access | High (9) | TC-12, TC-16 | Not run | RBAC routes exist; integration execution evidence is not yet recorded. |
+| E1 | IDOR / cross-owner access | High (9) | TC-12, TC-16, TC-24 | Partial | Staff ownership enforcement and denied-access auditing are implemented; execute and record TC-24 before any `Verified` claim. |
 | E2 | Edited role claim | High (6) | TC-13 | Pass | Tampered-token rejection has unit run evidence; DB-backed role reload remains future hardening. |
 | E3 | Insider administrator misuse | Medium (3) residual | — | Not tested | Residual risk mitigated by planned logging and least privilege. |
 | E4 | Direct SQLite role tampering | Medium (3) | TC-23 | Not run | File-permission and role-change audit evidence require implementation and inspection. |
@@ -123,7 +124,7 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 | 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/test_vault.py -v` | 13 | 13 | 0 | 0 | TBC | Independent local QA execution; vault storage and path-defense suite passed 13/13. |
 | 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/ -v` | 49 | 49 | 0 | 0 | `10a7ecd` | Auth/RBAC validation completed after latest PR #13 update; all 49 tests passed. |
 | 2026-10-20 | Dhruvi Sorathiya (Security QA & Demonstration Lead) | `python -m pytest tests/unit/ -v` | 53 | 53 | 0 | 0 | `c68d20e` | Final local QA run including audit/telemetry; 53/53 tests passed. `python -m ruff check .` also reported `All checks passed!`. |
-| 2026-10-23 | Copilot (documentation sync) | `tests/integration/test_api_flow.py` evidence review | n/a | n/a | n/a | n/a | `ac6584d` baseline | Integration test code exists for upload/download/RBAC/auth-negative/tamper flows, but no recorded execution evidence was found in this matrix; TC-06/TC-12/TC-16 remain `Not run`. |
+| 2026-10-23 | Copilot (documentation sync) | `tests/integration/test_api_flow.py` evidence review | n/a | n/a | n/a | n/a | `96e6e76` baseline | Integration test code exists for upload/download/RBAC/auth-negative/tamper flows, but no recorded execution evidence was found in this matrix; TC-06/TC-12/TC-16 remain `Not run` and TC-24 remains planned. |
 
 ## 7. Evidence Requirements
 
@@ -143,3 +144,4 @@ For every test marked `Pass`:
 | v0.2 | 2026-10-19 | D. Williams | Synchronized with threat-model v0.6: added TC-16 through TC-23, corrected TC-03/TC-07/TC-08/TC-15 evidence mappings, updated linked document versions and baseline commit, and added coverage for new supply-chain, CI, replay, nonce, audit-log, key-loss, and SQLite-tampering threats. |
 | v0.3 | 2026-10-22 | Dhruvi Sorathiya | Added independent QA execution evidence for crypto (20/20), vault (13/13), Auth/RBAC (49/49), and audit/telemetry (53/53), including Ruff validation results. |
 | v0.3 | 2026-10-23 | Copilot | Synchronized header/baseline and linked versions (`main@ac6584d...`, threat model v1.0, documentation guide v0.9); reconciled TC status/location/evidence with current unit and integration sources; kept integration-only rows conservative as `Not run` without explicit run evidence. |
+| v0.4 | 2026-10-23 | Copilot | Synchronized to `main@96e6e764...` after merged PR #22; added TC-24 for Staff cross-owner download denial (`403` + `ACCESS_DENIED`/`BLOCKED`) and kept its status as planned pending execution evidence. |

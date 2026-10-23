@@ -28,9 +28,13 @@
   - [x] Integration is present on `main`
 - [ ] **[Phase 5] Final Delivery Support (10/21 - 10/24)**
   - [ ] Validate live attack demonstration scripts and integration flows
+  - [x] Resolve Staff object-level authorization (IDOR/BOLA) for document downloads
+  - [x] Correct AES-256 key handling to use validated decoded 32-byte binary key material
+  - [x] Apply HTML entity escaping to dynamic telemetry values in the demo viewer to mitigate stored XSS
+  - [ ] Record post-merge QA/regression evidence for merged security fixes
   - [ ] Complete production-hardening backlog (dependency pinning + operational safeguards)
   - [ ] Upgrade audit telemetry to cryptographic integrity (hash-chain/HMAC or equivalent)
-  - [ ] Review system architecture and technical implementation specs in the final report
+  - [ ] Review synchronized architecture, threat model, test matrix, and technical implementation specs in the final report
 
 ---
 
