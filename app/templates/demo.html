@@ -182,7 +182,6 @@
     </style>
 </head>
 <body>
-
     <!-- Header -->
     <div class="header-bar">
         <div class="sys-title">
@@ -434,6 +433,16 @@
         let activePlainContent = "";
         let isBitFlipped = false;
 
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[c]));
+        }
+        
         window.onload = function() {
             switchUserRole('staff_user', document.getElementById('btn-staff'));
         };
@@ -917,52 +926,55 @@
 
         async function fetchAuditTelemetryStream() {
             const tbody = document.getElementById('auditStreamBody');
+            if (!tbody) return;
+
             try {
                 const res = await fetch('/api/v1/audit/logs?limit=8', {
-                    headers: { 'Authorization': `Bearer ${currentJwt}` }
+                    headers: { 'Authorization': `Bearer ${currentJwt || currentToken}` }
                 });
 
                 if (res.status === 403) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#ef4444;">[403 Forbidden] Role '${currentRole}' is unauthorized to read forensic audit logs.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#ef4444;">[403 Forbidden] Unauthorized to read forensic audit logs.</td></tr>`;
                     return;
                 }
 
                 const events = await res.json();
                 if (Array.isArray(events) && events.length > 0) {
                     tbody.innerHTML = events.map(e => {
-                        // 1. Intelligent Target File ID Extraction
+                        // 1. File ID 안전한 이스케이프 처리 (onclick 속성 주입 방어)
                         const rawFileId = e.target_resource_id || e.details?.file_id || null;
                         let fileIdHtml = `<span style="color:#64748b; font-size:11px;">-</span>`;
                         
                         if (rawFileId) {
-                            const shortId = rawFileId.length > 16 ? rawFileId.substring(0, 14) + '...' : rawFileId;
+                            const safeFileId = esc(rawFileId);
+                            const shortId = safeFileId.length > 16 ? safeFileId.substring(0, 14) + '...' : safeFileId;
                             fileIdHtml = `
                                 <span style="color:#38bdf8; font-weight:bold; cursor:pointer; text-decoration:underline;" 
-                                      title="Click to copy and search: ${rawFileId}" 
-                                      onclick="navigator.clipboard.writeText('${rawFileId}'); document.getElementById('searchFileIdInput').value='${rawFileId}'; alert('Copied File ID: ${rawFileId}\\nAutomatically loaded into Feature 3 search bar!');">
+                                    title="Click to search: ${safeFileId}" 
+                                    onclick="navigator.clipboard.writeText('${safeFileId}'); document.getElementById('searchFileIdInput').value='${safeFileId}';">
                                     ${shortId}
                                 </span>
                             `;
                         }
 
-                        // 2. Clean Context Formatter (Removes raw JSON braces)
+                        // 2. Details 내부 필드(filename, reason, role 등) 이스케이프 처리
                         let contextParts = [];
-                        if (e.details?.reason) contextParts.push(`<span style="color:#f87171;">Reason: ${e.details.reason}</span>`);
-                        if (e.details?.filename) contextParts.push(`<span>File: <strong>${e.details.filename}</strong></span>`);
-                        if (e.details?.role) contextParts.push(`<span>Role: ${e.details.role}</span>`);
-                        if (e.details?.sha256) contextParts.push(`<span style="color:#94a3b8;">SHA: ${e.details.sha256.substring(0, 12)}...</span>`);
+                        if (e.details?.reason) contextParts.push(`<span style="color:#f87171;">Reason: ${esc(e.details.reason)}</span>`);
+                        if (e.details?.filename) contextParts.push(`<span>File: <strong>${esc(e.details.filename)}</strong></span>`);
+                        if (e.details?.role) contextParts.push(`<span>Role: ${esc(e.details.role)}</span>`);
+                        if (e.details?.sha256) contextParts.push(`<span style="color:#94a3b8;">SHA: ${esc(e.details.sha256.substring(0, 12))}...</span>`);
 
                         let contextHtml = contextParts.join(" &bull; ");
                         if (!contextHtml && Object.keys(e.details || {}).length > 0) {
-                            contextHtml = JSON.stringify(e.details);
+                            contextHtml = esc(JSON.stringify(e.details));
                         }
 
-                        // 3. Render Formatted Table Row
+                        // 3. actor_id와 event_type 등 모든 사용자 유입 필드를 esc()로 보호
                         return `
                             <tr>
-                                <td>${new Date(e.timestamp).toLocaleTimeString()}</td>
-                                <td><span class="badge ${e.event_type.includes('FAIL') || e.event_type.includes('DENIED') ? 'badge-red' : 'badge-green'}">${e.event_type}</span></td>
-                                <td><strong>${e.actor_id}</strong></td>
+                                <td>${esc(new Date(e.timestamp).toLocaleTimeString())}</td>
+                                <td><span class="badge ${e.event_type.includes('FAIL') || e.event_type.includes('DENIED') ? 'badge-red' : 'badge-green'}">${esc(e.event_type)}</span></td>
+                                <td><strong>${esc(e.actor_id)}</strong></td>
                                 <td>${fileIdHtml}</td>
                                 <td style="color:#cbd5e1; font-size:11px;">${contextHtml || '-'}</td>
                             </tr>

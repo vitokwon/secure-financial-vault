@@ -4,6 +4,7 @@ Composition Root: Instantiates concrete security engines and provides
 FastAPI dependency injection providers according to domain protocols.
 """
 
+import base64
 from pathlib import Path
 
 from fastapi import Depends, HTTPException, status
@@ -31,7 +32,12 @@ security_bearer = HTTPBearer(auto_error=True)
 
 def get_cipher_engine() -> CipherEngineProtocol:
     """Provides authenticated AES-256-GCM cipher engine using configured master key."""
-    raw_key = settings.encryption_key.encode("utf-8")[:32]
+    # settings._decode_encryption_key가 있으면 사용하고, 없으면 base64로 직접 디코딩
+    if hasattr(settings, "_decode_encryption_key"):
+        raw_key = settings._decode_encryption_key(settings.encryption_key)
+    else:
+        raw_key = base64.b64decode(settings.encryption_key)
+
     return AesGcmCipherEngine(key=raw_key)
 
 

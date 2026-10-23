@@ -136,6 +136,18 @@ def download_document(
     # 1. Fetch ciphertext binary and metadata envelope from isolated storage
     try:
         ciphertext, envelope = storage.read_blob(file_id)
+
+        if current_user.role == UserRole.STAFF and envelope.owner_id != current_user.sub:
+            audit_logger.log(
+                AuditEvent(
+                    event_type=AuditEventType.ACCESS_DENIED,
+                    actor_id=current_user.sub,
+                    target_resource_id=file_id,
+                    status="BLOCKED",
+                )
+            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
     except FileNotFoundError:
         audit_logger.log(
             AuditEvent(
