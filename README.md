@@ -25,7 +25,14 @@ Enterprise-grade document repository tailored for financial environments featuri
 - [x] **Phase 2: Secure Vault Storage (10/11 - 10/14)**: Canonical path traversal defense (`../`), encrypted envelope disk I/O (`PR #3`)
 - [x] **Phase 3: 3-Tier RBAC & Auth (10/14 - 10/17)**: Bcrypt password hashing, JWT token lifecycle, role-based route guards (`PR #5`)
 - [x] **Phase 4: Audit & Telemetry (10/17 - 10/20)**: Append-only JSONL logger, immutable audit schema, sensitive credential redaction (`PR #6`)
-- [ ] **Phase 5: System Integration & Final Delivery (10/20 - 10/24)**: Composition root wiring, Swagger UI verification, automated E2E test suite, STRIDE report, and live attack demo
+- [ ] **Phase 5: System Integration & Final Delivery (10/20 - 10/24)**: Partial completion — integration/security fixes are merged; final verification and delivery artifacts remain
+  - [x] Composition root wiring and protected API route integration
+  - [x] Swagger UI verification and automated E2E test suite implementation
+  - [x] Staff object-level download authorization (`owner_id` check with 403 + `ACCESS_DENIED`/`BLOCKED`)
+  - [x] AES-256 key handling corrected to use the validated decoded 32-byte key
+  - [x] Demo telemetry viewer stored-XSS mitigation via HTML escaping
+  - [ ] Record post-merge regression/inspection evidence (including TC-24 execution evidence)
+  - [ ] Final STRIDE report, live demo rehearsal, presentation deck, dry run, and Blackboard submission
 
 👉 *For individual daily task items and sprint deadlines, please see the full [Work Breakdown Structure (WBS)](docs/wbs.md).*
 

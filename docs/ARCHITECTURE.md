@@ -6,8 +6,8 @@
 | Reviewer | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Current version | **v0.1 — Draft** |
 | Last updated | 2026-10-23 |
-| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v1.0 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.3 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.9 |
-| Code baseline | `main` at `ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5` |
+| Linked documents | [`THREAT_MODEL.md`](THREAT_MODEL.md) v1.0 · [`TEST_MATRIX.md`](TEST_MATRIX.md) v0.4 · [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) v0.9 |
+| Code baseline | `main` at `96e6e76426ae3db4968bdaaa61389b7f47f4e0dc` |
 
 > This document distinguishes implemented repository components from still-open prototype hardening items.
 
@@ -89,7 +89,7 @@ flowchart LR
 
 ### 4.1 AES-256-GCM
 
-`AesGcmCipherEngine` requires a 32-byte key. It generates a random 12-byte nonce for each encryption operation and returns the nonce prefixed to the ciphertext and authentication tag. During decryption, an invalid tag raises an error before plaintext is returned. Nonce-uniqueness evidence is recorded in `TEST_MATRIX.md` for TC-17.
+`AesGcmCipherEngine` requires a 32-byte key. The composition root now passes the validated, decoded 32-byte binary key from configuration decoding (instead of truncating the encoded Base64 text). It generates a random 12-byte nonce for each encryption operation and returns the nonce prefixed to the ciphertext and authentication tag. During decryption, an invalid tag raises an error before plaintext is returned. Nonce-uniqueness evidence is recorded in `TEST_MATRIX.md` for TC-17.
 
 ### 4.2 SHA-256 Integrity Verification
 
@@ -158,6 +158,8 @@ sequenceDiagram
     API->>A: Verify JWT and check access
     A-->>API: Allowed, or 401/403
     API->>S: read_blob(file_id)
+    API->>A: If Staff, enforce envelope.owner_id == current_user.sub
+    A-->>API: Allowed, or 403 + ACCESS_DENIED (status BLOCKED)
     S->>C: Ciphertext + metadata envelope
     C-->>API: Decrypt after GCM verification
     API->>L: Log download/integrity-failure event
@@ -172,14 +174,14 @@ This matrix is based on the role definitions in [`THREAT_MODEL.md`](THREAT_MODEL
 |---|---|---|---|
 | Create users and assign roles | Planned ✓ | ✗ | ✗ |
 | Upload documents | Implemented ✓ | ✗ | Implemented ✓ |
-| Download any document | Implemented ✓ | Implemented ✓ read-only | Implemented ✓ (current prototype does not enforce per-document ownership categories) |
+| Download any document | Implemented ✓ | Implemented ✓ read-only | Implemented ✓ only for documents owned by the requesting Staff user |
 | Download documents permitted to own role | Implemented ✓ | Implemented ✓ | Implemented ✓ |
 | Delete documents | TBC | ✗ | ✗ |
 | View audit log | Implemented ✓ | Implemented ✓ | ✗ |
 | Delete or edit audit log entries | ✗ | ✗ | ✗ |
 | Change configuration | Planned ✓ | ✗ | ✗ |
 
-Current behavior: users are pre-seeded in memory, users cannot self-assign roles through API routes, and route guards enforce role claims from verified JWT payloads. Persistent database-backed role lookup is not implemented.
+Current behavior: users are pre-seeded in memory, users cannot self-assign roles through API routes, and route guards enforce role claims from verified JWT payloads. Staff download requests also enforce `envelope.owner_id == current_user.sub`; unauthorized cross-owner requests return `403` and append an `ACCESS_DENIED` audit event with `status: "BLOCKED"`. Persistent database-backed role lookup is not implemented.
 
 ## 7. Security Controls Map
 
@@ -187,7 +189,7 @@ Current behavior: users are pre-seeded in memory, users cannot self-assign roles
 |---|---|---|---|---|---|
 | bcrypt hashing, lockout, and generic errors | Auth service | S1 | F-05 | TC-01 | Password hashing and generic error handling implemented; lockout/rate-limiting remains planned |
 | HS256 fixed in code, strong secret, and short expiry | Configuration/auth | S2, S3, E2 | F-01, F-02, F-07 | TC-02, TC-07, TC-13, TC-18 | Configuration/JWT controls implemented; replay revocation remains planned |
-| Role reloaded from DB and deny by default | RBAC guards | E1, E2, E4 | — | TC-12, TC-13, TC-16, TC-23 | Deny-by-default route guards implemented; persistent DB-backed role reload remains planned |
+| Deny-by-default RBAC and Staff object-level ownership check | RBAC guards and vault download route | E1, E2, E4 | — | TC-12, TC-13, TC-16, TC-24, TC-23 | Route guards and Staff ownership enforcement are implemented; persistent DB-backed role reload remains planned |
 | AES-256-GCM authenticated encryption | Crypto engine | T1, I5, I7 | F-04 | TC-03, TC-15, TC-17 | Implemented; unit evidence is recorded for TC-03, TC-15, and TC-17 |
 | HMAC-protected integrity hashes | Crypto engine | T2 | — | TC-04 | Planned |
 | Safe path resolution and confinement | Vault storage | I2 | F-08 | TC-08 | Verified with passing vault unit tests |
@@ -222,7 +224,7 @@ Before the final report is exported, confirm:
 5. Define and implement final delete-document and audit-log retention/permissions policy.
 6. Confirm repository settings for branch protection, CODEOWNERS, action pinning, and MFA governance.
 7. Complete dependency pinning, package replacement, and `pip-audit` integration.
-8. Keep architecture claims aligned with `THREAT_MODEL.md` v1.0 and evidence in `TEST_MATRIX.md` v0.3.
+8. Keep architecture claims aligned with `THREAT_MODEL.md` v1.0 and evidence in `TEST_MATRIX.md` v0.4.
 
 ## 10. Change Log
 
@@ -232,3 +234,4 @@ Before the final report is exported, confirm:
 | v0.1 | 2026-10-19 | D. Williams | Synchronized linked-document versions and baseline with threat model v0.5 and documentation guide v0.5; documented configuration-hardening details. |
 | v0.1 | 2026-10-19 | D. Williams | Synchronized with threat model v0.6 and test matrix v0.2; added repository/CI boundary coverage, expanded control mappings, and documented remaining dependency, integration, and governance gaps. |
 | v0.1 | 2026-10-23 | Copilot | Synchronized architecture claims with current implementation (`main@ac6584d5c5e7bc35baa0a31e04a3a7d4d6c55df5`): marked auth/RBAC/audit/routers/composition wiring implemented, retained prototype limitations (seed users, no persistent user DB, append-only non-hash-chained audit log, plain SHA-256 metadata integrity), and aligned links/open items with threat model v1.0 and test matrix v0.3. |
+| v0.1 | 2026-10-23 | Copilot | Synchronized with merged PR #22 and `main@96e6e76426ae3db4968bdaaa61389b7f47f4e0dc`: documented Staff object-level download authorization with denied-access auditing, recorded decoded 32-byte AES key usage in composition wiring, and aligned linked evidence references. |

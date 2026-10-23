@@ -49,7 +49,7 @@ Base URL: `http://127.0.0.1:8000/api/v1/docs`
 - **Authorization Setup**:
   1. Copy `access_token`.
   2. Click **Authorize 🔒** in Swagger UI.
-  3. Enter `****** and authorize.
+  3. Enter the value as `<token_type> <access_token>` using the `token_type` and `access_token` values from the login response, then click **Authorize**.
 
 ---
 
@@ -130,7 +130,20 @@ Base URL: `http://127.0.0.1:8000/api/v1/docs`
 
 ---
 
-### Step 6. Auditor Access & Audit Log Retrieval
+### Step 6. Staff Object-Level Authorization / IDOR Denial
+- **Objective**: Confirm a Staff user cannot download another Staff user's document.
+- **Preparation**:
+  1. Upload a test document as one Staff identity and record its `file_id`.
+  2. Authenticate as a different Staff identity (or any non-owner Staff token available in your seeded/demo setup).
+  3. Execute `GET /api/v1/vault/download/{file_id}` with the non-owner Staff token.
+- **Expected Outcome**:
+  - **HTTP Status**: `403 Forbidden`
+  - Document bytes are not returned.
+  - `audit.log` includes an appended `ACCESS_DENIED` event for the attempted `file_id` with `status: "BLOCKED"`.
+
+---
+
+### Step 7. Auditor Access & Audit Log Retrieval
 - **Objective**: Authenticate as `auditor_user` and inspect audit records.
 - **Execution**:
   1. Authenticate via `POST /api/v1/auth/login`:
@@ -152,7 +165,7 @@ Base URL: `http://127.0.0.1:8000/api/v1/docs`
 
 ---
 
-### Step 7. Path Traversal / Invalid Identifier Handling
+### Step 8. Path Traversal / Invalid Identifier Handling
 - **Endpoint**: `GET /api/v1/vault/download/{file_id}`
 - **Objective**: Confirm non-existent or malicious identifiers do not expose arbitrary filesystem paths.
 - **Execution**:
