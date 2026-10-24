@@ -111,7 +111,7 @@ Every threat in [`THREAT_MODEL.md`](THREAT_MODEL.md) §6 is listed below. A thre
 | E1 | IDOR / cross-owner access | High (9) | TC-12, TC-16, TC-24 | Partial | Staff ownership enforcement and denied-access auditing are implemented; execute and record TC-24 before any `Verified` claim. |
 | E2 | Edited role claim | High (6) | TC-13 | Pass | Tampered-token rejection has unit run evidence; DB-backed role reload remains future hardening. |
 | E3 | Insider administrator misuse | Medium (3) residual | — | Not tested | Residual risk mitigated by planned logging and least privilege. |
-| E4 | Direct SQLite role tampering | Medium (3) | TC-23 | Not run | File-permission and role-change audit evidence require implementation and inspection. |
+| E4 | Direct database role tampering | Medium (3) | — | N/A | No database in this build; roles are fixed in seed accounts. Re-assess when a persistent user store is added. |
 
 ## 6. Run Log
 
@@ -141,7 +141,7 @@ For every test marked `Pass`:
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | v0.1 | 2026-10-18 | D. Williams (draft for D. Sorathiya) | Corrected initial matrix to match the current threat register; separated executable vault tests from blocked/planned tests; documented exact current test locations, proposed TC-16 handling, and evidence requirements. |
-| v0.2 | 2026-10-19 | D. Williams | Synchronized with threat-model v0.6: added TC-16 through TC-23, corrected TC-03/TC-07/TC-08/TC-15 evidence mappings, updated linked document versions and baseline commit, and added coverage for new supply-chain, CI, replay, nonce, audit-log, key-loss, and SQLite-tampering threats. |
+| v0.2 | 2026-10-19 | D. Williams | Synchronized with threat-model v0.6: added TC-16 through TC-23, corrected TC-03/TC-07/TC-08/TC-15 evidence mappings, updated linked document versions and baseline commit, and added coverage for new supply-chain, CI, replay, nonce, audit-log, key-loss, and database-tampering threats. |
 | v0.3 | 2026-10-22 | Dhruvi Sorathiya | Added independent QA execution evidence for crypto (20/20), vault (13/13), Auth/RBAC (49/49), and audit/telemetry (53/53), including Ruff validation results. |
 | v0.3 | 2026-10-23 | Copilot | Synchronized header/baseline and linked versions (`main@ac6584d...`, threat model v1.0, documentation guide v0.9); reconciled TC status/location/evidence with current unit and integration sources; kept integration-only rows conservative as `Not run` without explicit run evidence. |
 | v0.4 | 2026-10-23 | Copilot | Synchronized to `main@96e6e764...` after merged PR #22; added TC-24 for Staff cross-owner download denial (`403` + `ACCESS_DENIED`/`BLOCKED`) and kept its status as planned pending execution evidence. |

@@ -28,7 +28,7 @@ The current implementation remains a prototype: users are in-memory seed records
 | Authorization | Three-tier RBAC: Administrator, Compliance Auditor, General Staff | Implemented route-level role checks via `RequireRoles` in `app/dependencies.py`. |
 | Encryption | AES-256-GCM in `app/domains/crypto/aes_engine.py` | Implemented. AES-GCM authenticates ciphertext and rejects modified payloads. |
 | Integrity | SHA-256 with constant-time comparison in `app/domains/crypto/hasher.py` | Implemented. HMAC protection of stored hashes remains planned for T2. |
-| Metadata model | `EncryptedEnvelope` in `app/domains/vault/models.py` | Implemented for vault-file metadata. Full SQLite metadata integration is TBC. |
+| Metadata model | `EncryptedEnvelope` in `app/domains/vault/models.py` | Implemented: metadata is stored as `.meta.json` envelopes beside each ciphertext. SQLite was planned in the proposal but is not used; a persistent metadata store is future work. |
 | File store | `vault_storage/` through `DiskVaultStorage` | Implemented. Stores `{file_id}.bin` ciphertext separately from `{file_id}.meta.json` metadata. |
 | Audit log | Append-only JSONL event log | Implemented append-only `FileAuditLogger`; cryptographic tamper-proofing (hash chain/HMAC verification) remains open. |
 | Secrets and configuration | `.env`, `.env.example`, `setup.bat`, `app/config.py` | Implemented safeguards: startup rejects invalid/weak secrets; setup does not overwrite an existing `.env` and stops when required secrets are blank. |

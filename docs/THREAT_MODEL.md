@@ -6,7 +6,7 @@
 |---|---|
 | Document owner | David Williams (Threat Modeling & Technical Documentation Lead) |
 | Contributors | OhUk Kwon (Architecture, Crypto, RBAC) · Dhruvi Sorathiya (Validation, Logging, Testing) |
-| Current version | **v1.0 — Release Candidate** |
+| Current version | **v1.1 — Release Candidate** |
 | Last updated | 2026-10-23 |
 | Code baseline reviewed | `main` at commit `96e6e76426ae3db4968bdaaa61389b7f47f4e0dc`; includes merged PR #22 updates for Staff download ownership enforcement, AES key decoding usage, and demo telemetry HTML-escaping |
 | Methodology | STRIDE per element (§6.1), Likelihood × Impact risk rating before and after mitigation (§5, §6.2) |
@@ -15,7 +15,7 @@
 
 ## 1. Scope
 
-**In scope:** FastAPI backend, JWT authentication and RBAC, file encryption at rest, integrity verification, input validation, audit logging, local storage (SQLite + `vault_storage/`).
+**In scope:** FastAPI backend, JWT authentication and RBAC, file encryption at rest, integrity verification, input validation, audit logging, local storage (`vault_storage/`: ciphertext `.bin` files, `.meta.json` metadata envelopes, audit log). SQLite was planned in the proposal but is not used in this build.
 
 **Out of scope:** front-end styling, payment integration, multi-region deployment, host operating-system hardening, physical security.
 
@@ -37,7 +37,7 @@ The vault lets authenticated users upload and download financial documents accor
 | A2 | Encryption key (`.env`) | Compromise exposes every stored file |
 | A3 | JWT signing secret (`.env`) | Compromise allows forging any user and role |
 | A4 | User credentials (bcrypt hashes) | Account takeover |
-| A5 | File metadata, integrity hashes and user-role records (SQLite) | Basis for access and integrity decisions |
+| A5 | File metadata and integrity hashes (`.meta.json` envelopes); user-role records (in-memory seed accounts) | Basis for access and integrity decisions |
 | A6 | Audit log | Accountability and incident investigation |
 | A7 | Source code, dependencies and CI workflows | A compromised build delivers attacker code with full application privileges |
 
@@ -64,7 +64,7 @@ flowchart LR
         API --> VAL[Input validation]
         API --> CRYPTO[Crypto engine AES-GCM]
         CRYPTO -- "TB2: key access" --> KEYS[(.env secrets)]
-        API -- "TB3: storage" --> DB[(SQLite metadata)]
+        API -- "TB3: storage" --> DB[(Metadata envelopes .meta.json)]
         CRYPTO -- "TB3: storage" --> VAULT[(vault_storage/ ciphertext)]
         API -- "TB4: logging" --> LOG[(Audit log)]
     end
@@ -125,7 +125,7 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | E1 | Elevation | User requests another user's file by ID (IDOR/BOLA) | TB1 / A1 | 3 | 3 | **High (9)** | Server-side RBAC check on every request; Staff downloads enforce `envelope.owner_id == current_user.sub`; unauthorized cross-owner requests return `403` and emit `ACCESS_DENIED` with `status: "BLOCKED"` | Implemented | TC-12, TC-16, TC-24 | Show Staff cross-owner denial |
 | E2 | Elevation | User edits role claim in JWT | TB1 / A3 | 2 | 3 | **High (6)** | Signature verification; reload role from database per request | Planned | TC-13 | Optional |
 | E3 | Elevation | Insider admin misuses legitimate access | Whole system | 1 | 3 | **Medium (3) — residual** | Least privilege; separate key and storage duties; audit review | Planned | — | No |
-| E4 | Elevation / Tampering | User-role records edited directly in the SQLite file to self-promote | TB3 / A5 | 1 | 3 | **Medium (3)** | SQLite file readable and writable only by the application service account; roles changed only through the Admin API; every role change written to the audit log | Open | — | No |
+| E4 | Elevation / Tampering | User-role records edited directly in a database to self-promote | TB3 / A5 | 1 | 3 | **Medium (3)** | Not applicable to this build: there is no database and roles are fixed in code (seed accounts). Re-assess when a persistent user store is added | N/A | — | No |
 
 **Summary (v1.0):** 26 threats across all six STRIDE categories; 14 High, 10 Medium, 1 Low before mitigation.
 **Status (v1.0 synchronized to `main@96e6e764...`):** 6 Implemented (S2, R1, I1, I2, I5, E1) · 3 Verified (T1, I7, I8) · 14 Planned · 3 Open (T6, I4, E4). E1 implementation now includes Staff object-level ownership enforcement; TC-24 execution evidence is still required before any `Verified` status change.
@@ -142,7 +142,7 @@ Each element of the data flow diagram (§4) is checked against the STRIDE catego
 | Auth & RBAC | Process | S1, S2 | E2 | R1 | I4 | — | E1, E2, E4 | DoS on login handled by S1 rate limiting |
 | Crypto engine | Process | — | T1, I7 | — | I6, I7 | — | No user identity, actions or privileges at this layer |
 | `.env` secrets | Data store | n/a | — | n/a | I1, I6 | D4 | n/a | Tampering with keys requires host access and would cause decryption failures, not silent compromise |
-| SQLite metadata | Data store | n/a | T2, E4 | n/a | T4 | — | n/a | Database size bounded by D1 upload limits |
+| Metadata envelopes (`.meta.json`) | Data store | n/a | T2, T7 | n/a | — | D1 | n/a | Stored beside ciphertext in `vault_storage/`; no database in this build, so T4 and E4 do not apply |
 | `vault_storage/` | Data store | n/a | T1, T2 | n/a | I2, I5 | D1 | n/a | — |
 | Audit log | Data store | n/a | T3 | R1 | I8 | D3 | n/a | Audit log is a store whose purpose is accountability, so R is applied |
 | Repo, CI and dependencies (TB5) | External process | T6 | T5, T6 | — | — | — | T5 | Contributor spoofing via a stolen GitHub account is covered by T6; no secrets are stored in workflows; an unavailable package index delays builds but not the running vault |
@@ -210,7 +210,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | Master key compromise (I6) — **highest residual risk** | Prototype keeps one key in `.env` on the same host as the data; no HSM | Production would use a key vault/HSM and per-file keys wrapped by a master key |
 | Insider misuse (E3) | Authorized users can misuse legitimate access | Mitigated by logging and least privilege, not eliminated |
 | Interception in transit during the local demo (I3) | The demo runs over local HTTP without TLS | Demo traffic stays on one machine; TLS is a documented deployment requirement (§9) |
-| Direct database tampering by a host-level attacker (E4) | Anyone controlling the host can edit SQLite records | Host is assumed trusted (§9); role changes are intended to be audited |
+| Metadata envelope tampering by a host-level attacker (T2, T7) | Anyone controlling the host can edit or swap `.meta.json` files | Host is assumed trusted (§9); binding the file ID into AES-GCM associated data (F-14) and HMAC-protected hashes are planned |
 
 ## 9. Assumptions
 
@@ -242,6 +242,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v1.0 | 2026-10-21 | O. Kwon | Phase 5 Integration: Wired composition root dependencies, verified 3-tier RBAC Swagger endpoints, added automated E2E integration test suite, and documented verification guide |
 | v1.0 | 2026-10-23 | Copilot | Documentation synchronization only: updated baseline references to `main@ac6584d...`, reconciled status values with implemented auth/RBAC/audit integration and recorded unit-test evidence in `TEST_MATRIX.md`, and kept append-only audit logging distinct from not-yet-implemented cryptographic hash-chain/HMAC tamper resistance. |
 | v1.0 | 2026-10-23 | Copilot | Synchronized with merged PR #22 at `main@96e6e764...`: expanded E1 with Staff owner checks plus denied-access telemetry (`ACCESS_DENIED`/`BLOCKED`), mapped E1 coverage to TC-24 without verification claim, and added stored-XSS remediation finding F-13 as Implemented. |
+| v1.1 | 2026-10-24 | D. Williams | Removed SQLite references: the build stores metadata in `.meta.json` envelopes and uses in-memory seed accounts; E4 marked N/A; per-element and residual-risk rows updated |
 
 ## 12. Review Triggers
 
