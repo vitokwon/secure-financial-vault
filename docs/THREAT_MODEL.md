@@ -109,6 +109,7 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | T4 | Tampering / Info disclosure | SQL injection through login, search or metadata fields | TB1, TB3 / A4, A5 | 2 | 3 | **High (6)** | Parameterized queries / ORM only; server-side input validation | Planned | TC-14 | Optional |
 | T5 | Tampering / Elevation | Vulnerable or malicious third-party package (unpinned versions, typosquatting, known CVEs) runs inside the application | TB5 / A7, A1–A3 | 2 | 3 | **High (6)** | Pin exact versions in `requirements.txt`; replace `python-jose` and `passlib` (F-05); `pip-audit` in CI alongside Bandit; review every dependency change in a PR | Planned | TC-22 | No |
 | T6 | Tampering | CI workflow or `main` branch changed to skip security checks or merge unreviewed code (edited workflow, compromised contributor account) | TB5 / A7 | 1 | 3 | **Medium (3)** | Branch protection on `main` requiring a reviewed PR and passing checks; CODEOWNERS covering `.github/workflows/`; third-party actions pinned to a version or commit SHA; no secrets in workflow files; MFA on team GitHub accounts | Open | TC-23 | No |
+| T7 | Tampering | Ciphertext and metadata pair copied over another file's ID (substitution) | TB3 / A1, A5 | 2 | 3 | **High (6)** | Bind `file_id` as AES-GCM associated data (F-14) | Open | — | No |
 | R1 | Repudiation | User denies uploading, downloading or deleting a file | TB4 / A6 | 2 | 2 | **Medium (4)** | Log user ID, role, timestamp, IP and action (accountability, not legal non-repudiation) | Implemented | TC-06 | Show audit log |
 | I1 | Info disclosure | Encryption or JWT key exposed through the repository (committed `.env`, key in code) | TB2 / A2, A3 | 2 | 3 | **High (6)** | `.env` ignored in `.gitignore`; `ENCRYPTION_KEY` (legacy `FERNET_SECRET_KEY` fallback) must be URL-safe Base64 decoding to exactly 32 bytes; `JWT_SECRET_KEY` ≥ 32 bytes; `.env` loading dependency declared. Operational secret management (vault/HSM, rotation governance) is outside prototype scope | Implemented | TC-07 | Describe only |
 | I2 | Info disclosure | Path traversal via filename (`../../`) | TB1 / A1 | 2 | 3 | **High (6)** | `DiskVaultStorage.resolve_safe_path()` rejects null bytes, strips directory components via `Path(...).name`, resolves against the vault base path, and enforces confinement with `is_relative_to()` in `app/domains/vault/disk_storage.py` | Implemented | TC-08 | Show rejection |
@@ -127,7 +128,7 @@ Likelihood (L) and Impact (I) are each rated 1–3. **Risk = L × I.**
 | E3 | Elevation | Insider admin misuses legitimate access | Whole system | 1 | 3 | **Medium (3) — residual** | Least privilege; separate key and storage duties; audit review | Planned | — | No |
 | E4 | Elevation / Tampering | User-role records edited directly in a database to self-promote | TB3 / A5 | 1 | 3 | **Medium (3)** | Not applicable to this build: there is no database and roles are fixed in code (seed accounts). Re-assess when a persistent user store is added | N/A | — | No |
 
-**Summary (v1.0):** 26 threats across all six STRIDE categories; 14 High, 10 Medium, 1 Low before mitigation.
+**Summary (v1.1):** 27 threats across all six STRIDE categories; 16 High, 10 Medium, 1 Low before mitigation (T7 added in the final integration review).
 **Status (v1.0 synchronized to `main@96e6e764...`):** 6 Implemented (S2, R1, I1, I2, I5, E1) · 3 Verified (T1, I7, I8) · 14 Planned · 3 Open (T6, I4, E4). E1 implementation now includes Staff object-level ownership enforcement; TC-24 execution evidence is still required before any `Verified` status change.
 
 ### 6.1 STRIDE-per-Element Coverage
@@ -164,6 +165,7 @@ Residual risk assumes the listed mitigation is implemented. Owners follow the wo
 | T4 | O. Kwon | D. Sorathiya | Phase 3–4 | — | 1 × 3 | Medium (3) |
 | T5 | O. Kwon | D. Sorathiya | Before Phase 3 auth PR merges | Bandit in `code-quality.yml`; F-05 open; `setup.bat` installs unpinned requirements and upgrades pip (F-12) | 1 × 3 | Medium (3) |
 | T6 | D. Williams (repository settings, with team) | D. Sorathiya | Phase 4 (10/21) | Threat-model review workflow enforces doc updates; branch protection status to confirm | 1 × 2 | Low (2) |
+| T7 | O. Kwon | D. Sorathiya | Post-submission | Found in final integration review; fix is to pass `file_id` as associated data in `aes_engine.py` (F-14) | 1 × 3 | Medium (3) |
 | R1 | O. Kwon | D. Sorathiya | Phase 4 (10/21) | — | 1 × 2 | Low (2) |
 | I1 | O. Kwon | D. Sorathiya | Done — record run | `.gitignore`; `app/config.py` validation (F-02, F-03, F-04, F-10); `tests/unit/test_config.py` | 1 × 3 | Medium (3) |
 | I2 | O. Kwon | D. Sorathiya | Done — record run | `tests/unit/test_vault.py::test_directory_traversal_mitigation`, `::test_null_byte_injection_blocked` (F-08) | 1 × 3 | Medium (3) |
@@ -201,6 +203,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | F-11 | `setup.bat` | `.env` is created from `.env.example` only when absent and is never overwritten; keys are not auto-generated; setup stops if secrets are empty and runs configuration validation | D4, I1 | Medium | Implemented |
 | F-12 | `setup.bat`, `requirements.txt` | Installs dependency ranges without pins or hashes and upgrades pip to the latest release, so each setup can pull different package versions | T5 | Medium | Open |
 | F-13 | `app/templates/demo.html` | Dynamic telemetry values are HTML-escaped before rendering, mitigating stored XSS in the demo viewer | I4 | Low | Implemented |
+| F-14 | `app/domains/crypto/aes_engine.py` | AES-GCM called with `associated_data=None`, so a ciphertext is not bound to its file ID; a `.bin`/`.meta.json` pair can be copied over another ID undetected | T7, T2 | Medium | Open |
 
 ## 8. Residual Risks
 
@@ -243,6 +246,7 @@ Any High threat whose mitigation is not implemented and tested by the final dry 
 | v1.0 | 2026-10-23 | Copilot | Documentation synchronization only: updated baseline references to `main@ac6584d...`, reconciled status values with implemented auth/RBAC/audit integration and recorded unit-test evidence in `TEST_MATRIX.md`, and kept append-only audit logging distinct from not-yet-implemented cryptographic hash-chain/HMAC tamper resistance. |
 | v1.0 | 2026-10-23 | Copilot | Synchronized with merged PR #22 at `main@96e6e764...`: expanded E1 with Staff owner checks plus denied-access telemetry (`ACCESS_DENIED`/`BLOCKED`), mapped E1 coverage to TC-24 without verification claim, and added stored-XSS remediation finding F-13 as Implemented. |
 | v1.1 | 2026-10-24 | D. Williams | Removed SQLite references: the build stores metadata in `.meta.json` envelopes and uses in-memory seed accounts; E4 marked N/A; per-element and residual-risk rows updated |
+| v1.1 | 2026-10-24 | D. Williams | Added T7 (file substitution between IDs) and finding F-14 from the final integration review; summary updated to 27 threats (16 High, 10 Medium, 1 Low); T7 mitigation tracking row added |
 
 ## 12. Review Triggers
 
